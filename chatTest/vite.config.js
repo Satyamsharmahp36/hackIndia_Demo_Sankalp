@@ -1,18 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react()],
+  base: '/', 
   optimizeDeps: {
     include: ["@google/generative-ai"], 
   },
   build: {
     rollupOptions: {
-      external: ["@google/generative-ai"], 
+      external: [], 
     },
   },
   define: {
-    'process.env': process.env, 
+    'process.env': {}, 
   },
 });
