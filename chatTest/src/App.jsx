@@ -21,12 +21,22 @@ const App = () => {
     
     sessionStorage.setItem('hasStartedChat', 'true');
     
-    // Animate transition to chat
     setTimeout(() => {
       setShowChat(true);
       setIsTransitioning(false);
     }, 1000);
   };
+
+  useEffect(() => {
+    const keepAlive = setInterval(() => {
+      fetch(import.meta.env.VITE_BACKEND)
+        .then(res => res.json())
+        .then(data => console.log('Server kept alive:', data))
+        .catch(err => console.error('Error keeping server alive:', err));
+    }, 100000); // 
+
+    return () => clearInterval(keepAlive); 
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -67,7 +77,7 @@ const App = () => {
             className=""
           >
             <div className="h-screen flex items-center justify-center bg-gradient-to-r from-slate-500 to-slate-800"> 
-            <ChatBot userName={userName} />
+              <ChatBot userName={userName} />
             </div> 
           </motion.div>
         ) : (
