@@ -61,32 +61,6 @@ The app should now be running at: **http://localhost:5173** 🚀
 2️⃣ **Get AI Response**: ChatMate will generate an answer based on the latest data.  
 3️⃣ **Customize Prompts**: Click **Advanced** (password required) to edit chatbot knowledge.  
 
----
-## 📦 Deployment
-### 🚀 Deploy on Netlify
-1. **Push your code to GitHub**
-2. **Connect the repo to Netlify**
-3. **Set environment variables in Netlify**
-4. **Deploy & enjoy! 🎉**
-
----
-## 🎯 Roadmap
-- ✅ Add AI-powered responses
-- ✅ Implement password-protected prompt editing
-- 🚧 Improve UI with animations
-- 🚀 Integrate voice-to-text support
-
----
-## 🤝 Contributing
-Pull requests are welcome! If you'd like to contribute, please follow these steps:
-1. Fork the repo
-2. Create a new branch (`feature-xyz`)
-3. Commit changes and push (`git commit -m "Added xyz feature"`)
-4. Submit a pull request 🎉
-
----
-## 📜 License
-This project is licensed under the **MIT License**. Feel free to use and modify it as needed.
 
 ---
 ## 🌐 Connect with Me
