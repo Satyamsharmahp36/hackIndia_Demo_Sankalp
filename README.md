@@ -95,4 +95,4 @@ Ask from AI to , that how you can connect with me .
 
 ## Deployed Link
 
-https://unrivaled-griffin-2f94bc.netlify.app/
+https://dancing-peony-3be04d.netlify.app/
