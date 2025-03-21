@@ -29,7 +29,7 @@ const App = () => {
 
   useEffect(() => {
     const keepAlive = setInterval(() => {
-      fetch(import.meta.env.VITE_BACKEND)
+      fetch(`${import.meta.env.VITE_BACKEND}/prompt`)
         .then(res => res.json())
         .then(data => console.log('Server kept alive:', data))
         .catch(err => console.error('Error keeping server alive:', err));

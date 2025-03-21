@@ -4,7 +4,7 @@ const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GOOGLE_GENAI_API_KEY);
 
 export async function getAnswer(question) {
   try {
-    const promptResponse = await fetch('http://localhost:5000/prompt');
+    const promptResponse = await fetch(`${import.meta.env.VITE_BACKEND}/prompt`);
     const promptData = await promptResponse.json();
 
     console.log(promptData.prompt)
@@ -16,19 +16,22 @@ export async function getAnswer(question) {
     const prompt = `
 You are Satyam Sharma's personal AI assistant. Answer based on the following details. 
 If a question is unrelated, say "I don't have that information if you have answers to this then please contribute.
-Also answer questions in more funny and elobrative manner .
+Answer questions in bit elobrative manner and can also add funny things if needed .
 
 Here's Satyam's latest data:
 ${promptData.prompt}
 
 Question: ${question}
+
+Answer questions in bit elobrative manner and can also add funny things if needed .
+
 `;
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       generationConfig: {
         maxOutputTokens: 1024,
-        temperature: 0.9,
+        temperature: 0.8,
       },
     });
 
