@@ -2,7 +2,8 @@
 
 ChatMate is an intelligent AI assistant powered by **Google Generative AI**. It provides dynamic, contextual responses based on your custom dataset, making it a personalized chatbot for your needs.
 
-![ChatMate Preview](https://your-image-url.com)  
+![ChatMate Preview](https://github.com/user-attachments/assets/267c5706-dd73-41bf-96dc-57a343e9889a)
+
 
 ## 🌟 Features
 - 🤖 AI-powered chatbot using **Google Generative AI** (Gemini 1.5)
@@ -91,3 +92,7 @@ This project is licensed under the **MIT License**. Feel free to use and modify 
 ## 🌐 Connect with Me
 
 Ask from AI to , that how you can connect with me .
+
+## Deployed Link
+
+https://unrivaled-griffin-2f94bc.netlify.app/
