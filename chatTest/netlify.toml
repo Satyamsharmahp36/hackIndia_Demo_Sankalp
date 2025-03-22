@@ -1,8 +1,10 @@
+# In netlify.toml
 [[headers]]
-  for = "/*.js"
+  for = "/assets/*.js"
   [headers.values]
     Content-Type = "application/javascript"
+
 [[headers]]
-  for = "/*.mjs"
+  for = "/js/*.js"
   [headers.values]
     Content-Type = "application/javascript"
