@@ -903,7 +903,7 @@ const ChatBot = ({ userName }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen md:h-11/12 rounded-xl text-xl bg-gray-900 text-white shadow-2xl overflow-hidden">
+    <div className="flex flex-col h-screen md:h-11/12  lg:max-w-1/2 lg:rounded-xl text-xl bg-gray-900 text-white shadow-2xl overflow-hidden">
       <div className="bg-gray-800 py-4 rounded-t-xl px-6 flex justify-between items-center border-b border-gray-700">
         <div className="flex items-center">
           <Bot className="w-6 h-6 text-blue-400 mr-2" />

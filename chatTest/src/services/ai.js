@@ -23,7 +23,7 @@ ${promptData.prompt}
 
 Question: ${question}
 
-Answer questions in bit elobrative manner and can also add funny things if needed .
+Answer questions in bit elobrative manner and can also make it sound good.
 
 `;
 
