@@ -45,7 +45,6 @@ const HomePage = ({ onGetStarted }) => {
       exit={{ opacity: 0 }}
       className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col"
     >
-      {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-0 w-full h-full">
           {[...Array(20)].map((_, i) => (
@@ -100,6 +99,7 @@ const HomePage = ({ onGetStarted }) => {
             className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600 mb-4"
           >
             Satyam's AI Assistant
+            {console.log(import.meta.env.VITE_PASSWORD)}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
