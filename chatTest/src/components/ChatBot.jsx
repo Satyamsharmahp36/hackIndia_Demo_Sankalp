@@ -2,45 +2,40 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, Loader2, ExternalLink, Settings,ChevronDown , X,Trash2, Save, Lock, Unlock, AlertTriangle, Filter, Plus, CheckCircle, XCircle, Clock ,Info, HelpCircle } from 'lucide-react';
 import { getAnswer } from '../services/ai';
 import { motion, AnimatePresence } from 'framer-motion';
+import bcrypt from "bcryptjs";
+import ConfirmationModal from './ConfirmationModal';
 
 const apiService = {
-  getPrompt: async () => {
-    const response = await fetch(`${import.meta.env.VITE_BACKEND}/prompt`);
+  getPrompt: async (userId) => {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND}/prompt/${userId}`);
     const data = await response.json();
     return data.prompt;
   },
   
-  updatePrompt: async (content) => {
+  updatePrompt: async (content, userId) => {
     const response = await fetch(`${import.meta.env.VITE_BACKEND}/update-prompt`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, userId }),
     });
     return await response.json();
   },
   
-  clearPrompt: async () => {
-    const response = await fetch(`${import.meta.env.VITE_BACKEND}/clear-prompt`, {
-      method: 'DELETE',
-    });
-    return await response.json();
-  },
-  
-  submitContribution: async (name, question, answer) => {
+  submitContribution: async (name, question, answer, username ) => {
     const response = await fetch(`${import.meta.env.VITE_BACKEND}/contributions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, question, answer }),
+      body: JSON.stringify({ name, question, answer, username  }),
     });
     return await response.json();
   },
   
-  getContributions: async (status = null) => {
-    let url = `${import.meta.env.VITE_BACKEND}/contributions`;
+  getContributions: async (userId, status = null) => {
+    let url = `${import.meta.env.VITE_BACKEND}/contributions/${userId}`;
     if (status) {
       url += `?status=${status}`;
     }
@@ -48,17 +43,25 @@ const apiService = {
     return await response.json();
   },
   
-  updateContributionStatus: async (id, status) => {
-    const response = await fetch(`${import.meta.env.VITE_BACKEND}/contributions/${id}`, {
+  updateContributionStatus: async (contributionId, status, username) => {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND}/contributions/${contributionId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ 
+        status, 
+        username   
+      }),
     });
     return await response.json();
   }
 };
+
+let savedUserId = "";
+
+console.log("final :- ", savedUserId);
+
 
 const ContributionForm = ({ isOpen, onClose, lastQuestion }) => {
   const [name, setName] = useState(() => {
@@ -81,7 +84,7 @@ const ContributionForm = ({ isOpen, onClose, lastQuestion }) => {
     
     setIsSubmitting(true);
     try {
-      const result = await apiService.submitContribution(name, question, answer);
+      const result = await apiService.submitContribution(name, question, answer, localStorage.getItem('verifiedUserId') );
       setSubmitMessage(result.message);
       setSubmitStatus('success');
       setTimeout(() => {
@@ -237,20 +240,27 @@ const ContributionForm = ({ isOpen, onClose, lastQuestion }) => {
 
 
 const MessageContent = ({ content }) => {
-  const detectUrls = (text) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+  // Regular expression to match URLs
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+  // Function to convert URLs to markdown links
+  const convertUrlsToLinks = (text) => {
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
+        // Extract link text based on the platform
+        const linkText = part.includes('linkedin.com') 
+          ? 'LinkedIn Profile' 
+          : 'Link';
+        
         return (
           <a 
             key={index} 
             href={part} 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="text-blue-500 hover:underline inline-flex items-center gap-1 transition-colors duration-300"
+            className="text-blue-400 hover:underline"
           >
-            <span>{part}</span>
-            <ExternalLink className="w-3 h-3" />
+            {linkText}
           </a>
         );
       }
@@ -258,15 +268,7 @@ const MessageContent = ({ content }) => {
     });
   };
 
-  const processContent = (text) => {
-    return text.split('\n').map((line, i) => (
-      <p key={i} className="mb-2">
-        {detectUrls(line)}
-      </p>
-    ));
-  };
-
-  return <div className="space-y-1">{processContent(content)}</div>;
+  return <div>{convertUrlsToLinks(content)}</div>;
 };
 
 const TypingEffect = ({ text }) => {
@@ -288,7 +290,7 @@ const TypingEffect = ({ text }) => {
 };
 
 
-const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
+const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
   const [passwordInput, setPasswordInput] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [promptContent, setPromptContent] = useState('');
@@ -298,9 +300,13 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
   const [activeTab, setActiveTab] = useState('prompt'); 
   const [contributions, setContributions] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
+  // const userId = user?._id || '';
+  // const geminiApiKey = user?.geminiApiKey || '';
+  // const userPlan = user?.plan || 'free';
+  // const uniqueId= user?.username|| "";
   
   const checkPassword = () => {
-    if (passwordInput === import.meta.env.VITE_PASSWORD) {
+    if (passwordInput === password) {
       setAuthenticated(true);
       fetchPrompt();
       fetchContributions();
@@ -313,7 +319,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
   const fetchPrompt = async () => {
     setIsLoading(true);
     try {
-      const promptData = await apiService.getPrompt();
+      const promptData = await apiService.getPrompt(localStorage.getItem('verifiedUserId'));
       setPromptContent(promptData || '');
     } catch (err) {
       setError('Failed to fetch prompt');
@@ -326,7 +332,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
   const fetchContributions = async (status = '') => {
     setIsLoading(true);
     try {
-      const data = await apiService.getContributions(status || null);
+      const data = await apiService.getContributions(localStorage.getItem('verifiedUserId'),status || null);
       setContributions(data);
     } catch (err) {
       setError('Failed to fetch contributions');
@@ -336,10 +342,10 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
     }
   };
   
-  const updatePrompt = async () => {
+  const updatePrompte = async () => {
     setIsLoading(true);
     try {
-      await apiService.updatePrompt(promptContent);
+      await apiService.updatePrompt(promptContent,localStorage.getItem('verifiedUserId'));
       setSuccessMessage('Prompt updated successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
       onPromptUpdated();
@@ -369,10 +375,10 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
     }
   };
   
-  const updateContributionStatus = async (id, status) => {
+  const updateContributionStatuse = async (id, status) => {
     setIsLoading(true);
     try {
-      await apiService.updateContributionStatus(id, status);
+      await apiService.updateContributionStatus(id, status,localStorage.getItem('verifiedUserId'));
       fetchContributions(statusFilter);
       setSuccessMessage(`Contribution ${status}`);
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -595,7 +601,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
                       <motion.button
                         whileHover={{ scale: 1.02, y: -2 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={updatePrompt}
+                        onClick={updatePrompte}
                         disabled={isLoading}
                         className="flex-1 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg shadow-lg hover:shadow-blue-500/30 transition-all font-medium flex items-center justify-center"
                       >
@@ -726,7 +732,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => updateContributionStatus(contribution._id, 'approved')}
+                    onClick={() => updateContributionStatuse(contribution._id, 'approved')}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-lg hover:shadow-green-500/20"
                   >
                     <CheckCircle className="w-4 h-4" />
@@ -736,7 +742,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => updateContributionStatus(contribution._id, 'rejected')}
+                    onClick={() => updateContributionStatuse(contribution._id, 'rejected')}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 shadow-lg hover:shadow-red-500/20"
                   >
                     <XCircle className="w-4 h-4" />
@@ -749,7 +755,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => updateContributionStatus(contribution._id, 'pending')}
+                  onClick={() => updateContributionStatuse(contribution._id, 'pending')}
                   className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 shadow-lg"
                 >
                   <Clock className="w-4 h-4" />
@@ -792,16 +798,24 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated }) => {
 };
 
 
-const ChatBot = ({ userName }) => {
+
+const ChatBot = ({ userName, userData, onRefetchUserData }) => {
+  const savedUserId = localStorage.getItem('verifiedUserId');
+
   const [messages, setMessages] = useState(() => {
-    const savedMessages = sessionStorage.getItem('chatHistory');
-    return savedMessages ? JSON.parse(savedMessages) : [
-      {
-        type: 'bot',
-        content: `Hi${userName ? ' ' + userName : ''}! I'm Satyam's AI assistant. Feel free to ask me about my projects, experience, or skills!`,
-        timestamp: new Date().toISOString()
-      }
-    ];
+    const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+    
+    const userChatHistory = savedUserId && allChatHistories[savedUserId] 
+      ? allChatHistories[savedUserId] 
+      : [
+          {
+            type: 'bot',
+            content: `Hi${userName ? ' ' + userName : ''}! I'm ${userData.user.name} AI assistant. Feel free to ask me about my projects, experience, or skills!`,
+            timestamp: new Date().toISOString()
+          }
+        ];
+
+    return userChatHistory;
   });
   
   const [input, setInput] = useState('');
@@ -810,9 +824,45 @@ const ChatBot = ({ userName }) => {
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [promptUpdated, setPromptUpdated] = useState(false);
   const [lastQuestion, setLastQuestion] = useState('');
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const clearChatHistory = () => {
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleConfirmDeleteHistory = () => {
+    const savedUserId = localStorage.getItem('verifiedUserId');
+    
+    if (savedUserId) {
+      // Remove chat history for the specific user
+      const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+      delete allChatHistories[savedUserId];
+      localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
+    }
+
+    // Reset messages to initial state with a personalized welcome message
+    const initialMessage = {
+      type: 'bot',
+      content: `Hi${userName ? ' ' + userName : ''}! I'm ${userData.user.name} AI assistant. Feel free to ask me about my projects, experience, or skills!`,
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages([initialMessage]);
+
+    // Close confirmation modal
+    setShowDeleteConfirmation(false);
+    
+    // Show success modal
+    setShowDeleteSuccessModal(true);
+
+    // Automatically hide success modal after 3 seconds
+    setTimeout(() => {
+      setShowDeleteSuccessModal(false);
+    }, 3000);
+  };
 
   useEffect(() => {
     if (!userName) {
@@ -821,7 +871,7 @@ const ChatBot = ({ userName }) => {
         setMessages([
           {
             type: 'bot',
-            content: `Hi ${storedName}! I'm Satyam's AI assistant. Feel free to ask me about my projects, experience, or skills!`,
+            content: `Hi ${storedName}! I'm ${userData.user.name}'s AI assistant. Feel free to ask me about my projects, experience, or skills!`,
             timestamp: new Date().toISOString()
           }
         ]);
@@ -832,11 +882,6 @@ const ChatBot = ({ userName }) => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-
-  useEffect(() => {
-    sessionStorage.setItem('chatHistory', JSON.stringify(messages));
-    scrollToBottom();
-  }, [messages]);
 
   const handleSendMessage = async () => {
     if (input.trim() === '') return;
@@ -853,7 +898,7 @@ const ChatBot = ({ userName }) => {
     setIsLoading(true);
 
     try {
-      const response = await getAnswer(input);
+      const response = await getAnswer(input, userData.user);
       
       const botMessage = {
         type: 'bot',
@@ -877,18 +922,44 @@ const ChatBot = ({ userName }) => {
     }
   };
 
-  const clearChatHistory = () => {
-    if (window.confirm('Are you sure you want to clear your chat history?')) {
-      const storedName = sessionStorage.getItem('userName');
-      setMessages([
-        {
-          type: 'bot',
-          content: `Hi${storedName ? ' ' + storedName : ''}! I'm Satyam's AI assistant. Feel free to ask me about my projects, experience, or skills!`,
-          timestamp: new Date().toISOString()
-        }
-      ]);
-    }
-  };
+
+  const DeleteConfirmationModal = () => (
+    <AnimatePresence>
+      {showDeleteConfirmation && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        >
+          <motion.div
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="bg-gray-800 p-6 rounded-lg text-white max-w-md w-full"
+          >
+            <h2 className="text-xl font-bold mb-4">Delete Chat History</h2>
+            <p className="mb-6">Are you sure you want to delete your entire chat history? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-4">
+              <button 
+                onClick={() => setShowDeleteConfirmation(false)}
+                className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleConfirmDeleteHistory}
+                className="px-4 py-2 bg-red-600 rounded hover:bg-red-500 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -897,17 +968,24 @@ const ChatBot = ({ userName }) => {
     }
   };
 
-  const handlePromptUpdated = () => {
-    setPromptUpdated(true);
-    setTimeout(() => setPromptUpdated(false), 3000);
+  const handlePromptUpdated = async () => {
+    try {
+      await onRefetchUserData();
+      
+      setPromptUpdated(true);
+      
+      setTimeout(() => setPromptUpdated(false), 3000);
+    } catch (error) {
+      console.error('Error refetching user data:', error);
+    }
   };
 
   return (
-    <div className="flex flex-col h-screen md:h-11/12  lg:max-w-1/2 lg:rounded-xl text-xl bg-gray-900 text-white shadow-2xl overflow-hidden">
+    <div className="flex flex-col h-screen md:h-11/12 lg:max-w-1/2 lg:rounded-xl text-xl bg-gray-900 text-white shadow-2xl overflow-hidden">
       <div className="bg-gray-800 py-4 rounded-t-xl px-6 flex justify-between items-center border-b border-gray-700">
         <div className="flex items-center">
           <Bot className="w-6 h-6 text-blue-400 mr-2" />
-          <h1 className="text-xl font-bold">Satyam's AI Assistant</h1>
+          <h1 className="text-xl font-bold"> {userData.user.name}'s AI Assistant</h1>
         </div>
         <div className="flex gap-2">
           <motion.button
@@ -1029,7 +1107,7 @@ const ChatBot = ({ userName }) => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Ask me anything about Satyam..."
+              placeholder={`Ask me anything about ${userData.user.name} ...`}
               className="flex-1 bg-transparent outline-none resize-none text-white placeholder-gray-400 max-h-32"
               rows={1}
             />
@@ -1064,10 +1142,27 @@ const ChatBot = ({ userName }) => {
         </div>
       </div>
 
+      <AnimatePresence>
+        {showDeleteSuccessModal && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50"
+          >
+            <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center">
+              <CheckCircle className="w-5 h-5 mr-2" />
+              Chat history deleted successfully
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AdminModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         onPromptUpdated={handlePromptUpdated}
+        password={userData.user.password}
       />
 
       <ContributionForm
@@ -1075,6 +1170,9 @@ const ChatBot = ({ userName }) => {
         onClose={() => setShowContributionForm(false)}
         lastQuestion={lastQuestion}
       />
+
+<DeleteConfirmationModal />
+
     </div>
   );
 };

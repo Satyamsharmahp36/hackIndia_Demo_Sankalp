@@ -1,30 +1,30 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GOOGLE_GENAI_API_KEY);
-
-export async function getAnswer(question) {
+export async function getAnswer(question, userData) {
   try {
-    const promptResponse = await fetch(`${import.meta.env.VITE_BACKEND}/prompt`);
-    const promptData = await promptResponse.json();
+    // const userResponse = await fetch(`${import.meta.env.VITE_BACKEND}/verify-user/${userId}`);
+    // const userData = await userResponse.json();
 
-    console.log(promptData.prompt)
-    
-    if (!promptData.prompt) {
-      return "No information available.";
+    if (!userData || !userData.geminiApiKey) {
+      return "No Gemini API key available for this user.";
     }
 
-    const prompt = `
-You are Satyam Sharma's personal AI assistant. Answer based on the following details. 
-If a question is unrelated, say "I don't have that information if you have answers to this then please contribute.
-Answer questions in bit elobrative manner and can also add funny things if needed .
+    // Create Generative AI instance with user's API key
+    const genAI = new GoogleGenerativeAI(userData.geminiApiKey);
 
-Here's Satyam's latest data:
-${promptData.prompt}
+    // Use the user's prompt or a default prompt
+    const prompt = `
+You are ${userData.name}'s personal AI assistant. Answer based on the following details. Also answer the question's in person like instead of AI the  ${userData.name} is answering questions
+If a you don't have data for any information say "I don't have that information. If you have answers to this, please contribute."
+Answer questions in a bit elaborate manner and can also add funny things if needed.
+
+Here's ${userData.name}'s latest data:
+${userData.prompt || 'No specific context provided'}
 
 Question: ${question}
 
-Answer questions in bit elobrative manner and can also make it sound good.
-
+Answer questions in a bit elaborate manner and make it sound good.
+When providing links, give plain URLs like  https://github.com/xxxx/
 `;
 
     const model = genAI.getGenerativeModel({ 
@@ -40,6 +40,33 @@ Answer questions in bit elobrative manner and can also make it sound good.
     return response.text();
   } catch (error) {
     console.error("Error generating answer:", error);
+    
+    // Provide a more user-friendly error message
+    if (error.message.includes('API key')) {
+      return "There was an issue with the API key. Please check your Gemini API configuration.";
+    }
+    
+    return "Sorry, I couldn't generate a response at this time.";
+  }
+}
+
+export async function updatePrompt(content, userId) {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND}/update-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content, userId }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update prompt');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating prompt:', error);
     throw error;
   }
 }

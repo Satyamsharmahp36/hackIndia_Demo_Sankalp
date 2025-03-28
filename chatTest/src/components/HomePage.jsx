@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowRight, Bot, Sparkles, Send, MessageSquare, User, ChevronRight } from 'lucide-react';
 
-const HomePage = ({ onGetStarted }) => {
-  const [name, setName] = useState('');
+import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { motion } from 'framer-motion';
+import { ArrowRight, Bot, Sparkles, Send, MessageSquare, User, ChevronRight, LogOut } from 'lucide-react';
+import ChatBot from './ChatBot';
+
+const HomePage = ({ userName, userData, onLogout }) => {
+  const [name, setName] = useState(userName || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isNameEntered, setIsNameEntered] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showChatBot, setShowChatBot] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState(userData);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem('userName');
@@ -35,9 +40,63 @@ const HomePage = ({ onGetStarted }) => {
   };
 
   const handleGetStarted = () => {
-    onGetStarted(name);
+    setShowChatBot(true);
   };
 
+  const refetchUserData = async () => {
+    try {
+      const savedUserId = localStorage.getItem('verifiedUserId');
+      
+      if (!savedUserId) {
+        throw new Error('No user ID found');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND}/verify-user/${savedUserId}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update user data in session storage
+        sessionStorage.setItem('userData', JSON.stringify(data));
+        
+        // Update current user data state
+        setCurrentUserData(data);
+
+        return data;
+      } else {
+        throw new Error(data.message || 'Failed to refetch user data');
+      }
+    } catch (error) {
+      console.error('Error refetching user data:', error);
+      throw error;
+    }
+  };
+
+  if (showChatBot) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gradient-to-r from-slate-500 to-slate-800 relative">
+        <ChatBot 
+          userName={name} 
+          userData={currentUserData} 
+          onRefetchUserData={refetchUserData} 
+        />
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onLogout}
+          className="absolute top-4 right-4 text-white bg-red-500 hover:bg-red-600 p-2 rounded-full flex items-center justify-center"
+        >
+          <LogOut className="w-5 h-5" />
+        </motion.button>
+      </div>
+    )
+  }
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -98,8 +157,7 @@ const HomePage = ({ onGetStarted }) => {
             transition={{ delay: 0.3 }}
             className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600 mb-4"
           >
-            Satyam's AI Assistant
-            {console.log(import.meta.env.VITE_PASSWORD)}
+            {`${userData.user.name}'s AI Assistant`}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -107,7 +165,7 @@ const HomePage = ({ onGetStarted }) => {
             transition={{ delay: 0.5 }}
             className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto"
           >
-            Get answers to all your questions about Satyam's projects, experience, and skills
+            {`Get answers to all your questions about ${userData.user.name}'s projects, experience, and skills`}
           </motion.p>
         </motion.div>
 
@@ -223,6 +281,16 @@ const HomePage = ({ onGetStarted }) => {
       </div>
     </motion.div>
   );
+};
+
+// PropTypes for prop validation
+HomePage.propTypes = {
+  userName: PropTypes.string,
+  userData: PropTypes.shape({
+    user: PropTypes.shape({
+      _id: PropTypes.string
+    })
+  })
 };
 
 export default HomePage;
