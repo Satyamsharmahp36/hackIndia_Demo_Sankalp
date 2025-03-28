@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Info, UserCheck, Sparkles } from 'lucide-react';
+import { Info, UserCheck, Sparkles, ExternalLink } from 'lucide-react';
 
 const UserVerificationPage = ({ onUserVerified }) => {
   const [userId, setUserId] = useState('');
@@ -161,6 +161,25 @@ const UserVerificationPage = ({ onUserVerified }) => {
                 'Enter UserID'
               )}
             </motion.button>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="text-center mt-4"
+            >
+              <motion.a
+                href="https://graceful-pegasus-7e9200.netlify.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="text-purple-300 hover:text-pink-400 transition-colors flex items-center justify-center"
+              >
+                <span>Wanted to create your own chatbot?</span>
+                <ExternalLink className="ml-2 w-4 h-4 text-pink-400" />
+              </motion.a>
+            </motion.div>
           </form>
         </div>
       </motion.div>
