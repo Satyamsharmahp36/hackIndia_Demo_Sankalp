@@ -140,7 +140,7 @@ const SignupPage = () => {
 
     if (validateForm()) {
       try {
-        const response = await axios.post('http://localhost:5000/register', {
+        const response = await axios.post('https://chatmate-cf4d.onrender.com/register', {
           name: formData.name,
           email: formData.email,
           mobileNo: formData.mobileNo,
