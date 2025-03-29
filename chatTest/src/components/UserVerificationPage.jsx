@@ -169,7 +169,7 @@ const UserVerificationPage = ({ onUserVerified }) => {
               className="text-center mt-4"
             >
               <motion.a
-                href="https://graceful-pegasus-7e9200.netlify.app/"
+                href="https://chat-matee.vercel.app/"
                 target="_blank"
                 rel="noopener noreferrer"
                 whileHover={{ scale: 1.05 }}

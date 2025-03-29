@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
+const axios = require('axios');
+
 
 dotenv.config();
 
@@ -150,14 +152,23 @@ app.get('/verify-user/:identifier', async (req, res) => {
   }
 });
 
-// app.get('/temp', async (req, res) => {
-//   try {
-//     const user = await User.findOne({ username: req.params.identifier });
-//     if (!user) return res.status(404).json({ message: "User not found" });
-//     res.json({ user: { _id: user._id, name: user.name, username: user.username, geminiApiKey: user.geminiApiKey, plan: user.plan, prompt: user.prompt, contributions: user.contributions,password : user.password } });
-//   } catch (error) {
-//     res.status(500).json({ message: "Error verifying user", error: error.message });
-//   }
-// });
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
-app.listen(5000, () => console.log('Server running on port 5000'));
+const PING_SERVICE_URL = process.env.PING_SERVICE_URL;
+
+const pingSecondaryService = async () => {
+  try {
+    const response = await axios.get(PING_SERVICE_URL);
+    console.log(`Pinged secondary service at ${new Date().toISOString()} - Response: ${response.status}`);
+  } catch (error) {
+    console.error(`Error pinging secondary service: ${error.message}`);
+  }
+};
+
+app.listen(5000, () => {
+  console.log('Server running on port 5000');
+  
+  setInterval(pingSecondaryService, 10 * 60 * 1000);
+});

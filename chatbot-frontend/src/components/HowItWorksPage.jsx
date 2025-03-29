@@ -1,99 +1,167 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Brain, Globe2, Zap, Settings, Shield } from 'lucide-react';
+import { 
+  Users, 
+  Settings, 
+  UserPlus, 
+  Key, 
+  BookOpen, 
+  HelpCircle, 
+  Shield, 
+  Scroll
+} from 'lucide-react';
 
-function HowItWorksPage() {
-  const steps = [
+function ChatMateDocumentation() {
+  const [activeSection, setActiveSection] = useState(null);
+
+  const handleClick = () => {
+    window.open('http://localhost:5174/', '_blank');
+  };
+
+  const documentationSections = [
     {
-      icon: <Bot className="w-12 h-12 text-blue-500" />,
-      title: "Initial Setup",
-      description: "Create your personalized ChatMate account and customize your AI assistant's personality and preferences."
+      icon: <UserPlus className="w-8 h-8 text-blue-500" />,
+      title: "Registration Process",
+      steps: [
+        "Click 'Get Started' on the homepage",
+        "Enter unique User ID (username)",
+        "Create a strong password",
+        "Password is crucial for editing dataset",
+        "Unique User ID allows others to ask questions about you"
+      ]
     },
     {
-      icon: <Brain className="w-12 h-12 text-purple-500" />,
-      title: "Intelligent Learning",
-      description: "ChatMate learns from your interactions, adapting to your communication style and work patterns."
+      icon: <Key className="w-8 h-8 text-purple-500" />,
+      title: "Gemini Key Setup",
+      steps: [
+        "Find the Gemini Key input box",
+        "Click info button for import instructions",
+        "Adding Gemini Key provides privacy protection",
+        "Ensures secure access to your AI assistant"
+      ]
     },
     {
-      icon: <Globe2 className="w-12 h-12 text-green-500" />,
-      title: "Multi-Platform Integration",
-      description: "Seamlessly connect ChatMate across your devices and work environments, from desktop to mobile."
+      icon: <Settings className="w-8 h-8 text-green-500" />,
+      title: "User Profile Configuration",
+      steps: [
+        "After login, enter your full name",
+        "Click settings button",
+        "Enter password to access settings",
+        "Navigate to 'User Data' section",
+        "Add details for AI to use",
+        "Save your preferences"
+      ]
     },
     {
-      icon: <Zap className="w-12 h-12 text-yellow-500" />,
-      title: "Task Automation",
-      description: "Automate repetitive tasks, manage schedules, and streamline your workflow with intelligent processing."
+      icon: <BookOpen className="w-8 h-8 text-yellow-500" />,
+      title: "Contribution Management",
+      steps: [
+        "Access contribution section",
+        "View unanswered questions",
+        "Contribute answers with options:",
+        "- Approved: Verified contributions",
+        "- Pending: Awaiting review",
+        "- Rejected: Inappropriate content"
+      ]
     },
     {
-      icon: <Settings className="w-12 h-12 text-cyan-500" />,
-      title: "Continuous Optimization",
-      description: "Receive regular updates and improvements based on user feedback and advanced machine learning techniques."
-    },
-    {
-      icon: <Shield className="w-12 h-12 text-red-500" />,
-      title: "Privacy & Security",
-      description: "Advanced encryption and strict privacy controls ensure your data remains confidential and protected."
+      icon: <Shield className="w-8 h-8 text-red-500" />,
+      title: "Privacy and Data Management",
+      steps: [
+        "Clear chat history",
+        "Control saved information",
+        "Manage Gemini Key settings",
+        "Review user contributions",
+        "Maintain control over AI interactions"
+      ]
     }
   ];
 
+  const renderSectionSteps = (section) => (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ 
+        opacity: activeSection === section.title ? 1 : 0, 
+        height: activeSection === section.title ? 'auto' : 0 
+      }}
+      transition={{ duration: 0.3 }}
+      className="overflow-hidden"
+    >
+      {activeSection === section.title && (
+        <ul className="pl-4 space-y-1 text-gray-300 text-sm">
+          {section.steps.map((step, index) => (
+            <li key={index} className="flex items-center space-x-2">
+              <Scroll className="w-4 h-4 text-blue-400" />
+              <span>{step}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </motion.div>
+  );
+
   return (
-    <div className="bg-gray-900 text-white p-8 rounded-2xl">
-      <motion.div
+    <div className="bg-gray-900 text-white max-h-[40vw] rounded-2xl flex flex-col overflow-hidden">
+      <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="max-w-5xl mx-auto"
+        className="container mx-auto px-4 pt-4"
       >
-        <h1 className="text-4xl font-bold mb-4 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-          How ChatMate Works
+        <h1 className="text-3xl font-bold mb-2 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+          ChatMate Documentation
         </h1>
-        <p className="text-xl text-gray-400 text-center mb-12">
-          Discover the intelligent journey of transforming your daily workflow
+        <p className="text-sm text-gray-400 text-center mb-4">
+          Comprehensive Guide to Using Your AI Assistant
         </p>
+      </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {steps.map((step, index) => (
+      <div className="flex-grow overflow-y-auto px-4 scrollbar-hide">
+        <div className="space-y-3 pb-4">
+          {documentationSections.map((section, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                delay: index * 0.2,
-                duration: 0.5
-              }}
-              whileHover={{ scale: 1.05 }}
-              className="bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700 transition-all duration-300"
+              whileHover={{ scale: 1.02 }}
+              className="bg-gray-800 rounded-xl overflow-hidden"
             >
-              <div className="flex justify-center mb-4">
-                {step.icon}
+              <div 
+                onClick={() => setActiveSection(activeSection === section.title ? null : section.title)}
+                className="flex items-center p-4 cursor-pointer hover:bg-gray-700 transition-colors"
+              >
+                <div className="mr-3">{section.icon}</div>
+                <h2 className="text-base font-semibold flex-grow">{section.title}</h2>
+                <HelpCircle 
+                  className={`w-5 h-5 ${
+                    activeSection === section.title 
+                    ? 'text-blue-500' 
+                    : 'text-gray-500'
+                  }`} 
+                />
               </div>
-              <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-              <p className="text-gray-400">{step.description}</p>
+              {renderSectionSteps(section)}
             </motion.div>
           ))}
         </div>
+      </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2, duration: 0.5 }}
-          className="mt-16 text-center"
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+        className="p-4 text-center bg-gray-800"
+      >
+        <h2 className="text-xl font-bold mb-2">Ready to Explore ChatMate?</h2>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleClick}
+          className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full text-white font-semibold text-base hover:from-blue-600 hover:to-purple-600 transition-all duration-300"
         >
-          <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-xl text-gray-400 mb-8">
-            Unlock the power of AI-driven productivity with ChatMate
-          </p>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-10 py-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full text-white font-bold text-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-300"
-          >
-            Start Your Free Trial
-          </motion.button>
-        </motion.div>
+          Start Your Journey
+        </motion.button>
       </motion.div>
     </div>
   );
 }
 
-export default HowItWorksPage;
+export default ChatMateDocumentation;

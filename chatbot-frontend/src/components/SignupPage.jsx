@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 
 const SignupPage = () => {
-  // Form state management
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -121,7 +120,6 @@ const SignupPage = () => {
       [name]: value
     }));
     
-    // Clear specific field error on change
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = {...prev};
@@ -131,16 +129,14 @@ const SignupPage = () => {
     }
   };
 
-  // Form Submission Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Reset global error
     setUiState(prev => ({...prev, globalError: null, loading: true}));
 
     if (validateForm()) {
       try {
-        const response = await axios.post('https://chatmate-cf4d.onrender.com/register', {
+        const response = await axios.post(`${import.meta.env.VITE_BACKEND}/register`, {
           name: formData.name,
           email: formData.email,
           mobileNo: formData.mobileNo,
@@ -181,7 +177,7 @@ const SignupPage = () => {
       username: { label: "Unique Username", type: "text" },
       password: { label: "Password", type: uiState.showPassword ? "text" : "password" },
       confirmPassword: { label: "Confirm Password", type: uiState.showPassword ? "text" : "password" },
-      geminiApiKey: { label: "Gemini API Key", type: "text" }
+      geminiApiKey: { label: "Gemini API Key ", type: "text" }
     };
 
     return (
@@ -220,6 +216,19 @@ const SignupPage = () => {
               {uiState.showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           )}
+          {field === 'geminiApiKey' && (
+            <motion.button 
+              type="button"
+              onClick={() => setUiState(prev => ({...prev, showGeminiKeyModal: true}))}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 
+                text-blue-200 hover:text-blue-300 
+                animate-pulse hover:animate-none"
+            >
+              <Info size={25} />
+            </motion.button>
+          )}
         </div>
         {errors[field] && (
           <motion.p 
@@ -239,14 +248,14 @@ const SignupPage = () => {
       initial="initial"
       animate="animate"
       variants={backgroundVariants}
-      className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-indigo-900 
+      className="min-h-screen md:min-h-[90vh] bg-gradient-to-br from-gray-900 via-black to-indigo-900 
       text-white flex items-center justify-center p-4 overflow-hidden relative"
     >
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-        className="w-full max-w-md bg-gray-800/60 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-purple-500/20 relative"
+        className="w-full max-w-md bg-gray-800/60 backdrop-blur-xl rounded-2xl p-6 shadow-2xl border border-purple-500/20 relative"
       >
         <motion.div 
           animate={{ 
@@ -259,78 +268,141 @@ const SignupPage = () => {
             repeat: Infinity,
             ease: 'easeInOut'
           }}
-          className="absolute top-4 right-4 text-purple-400"
+          className="absolute top-2 right-2 text-purple-400"
         >
-          <Sparkles size={24} />
+          <Sparkles size={20} />
         </motion.div>
 
-        <h2 className="text-4xl font-bold text-center mb-8 bg-clip-text text-transparent 
+        <h2 className="text-3xl font-bold text-center mb-6 bg-clip-text text-transparent 
         bg-gradient-to-r from-blue-500 to-purple-600 tracking-wider">
-          Create Your Account
+          Create Account
         </h2>
 
         {uiState.globalError && (
-          <div className="bg-red-500/20 border border-red-500 p-3 rounded-xl mb-4 flex items-center">
-            <AlertTriangle className="mr-2 text-red-500" />
-            <p className="text-red-300">{uiState.globalError}</p>
+          <div className="bg-red-500/20 border border-red-500 p-2 rounded-xl mb-3 flex items-center">
+            <AlertTriangle className="mr-2 text-red-500" size={18} />
+            <p className="text-red-300 text-sm">{uiState.globalError}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {['name', 'email', 'mobileNo', 'username', 'password', 'confirmPassword', 'geminiApiKey'].map(renderInputField)}
 
           <motion.button
             whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(99, 102, 241, 0.5)' }}
             whileTap={{ scale: 0.95 }}
             disabled={uiState.loading}
-            className="w-full p-4 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 
-            font-bold text-lg
+            className="w-full p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 
+            font-bold text-base
             hover:from-blue-700 hover:to-purple-700 
             disabled:opacity-50 disabled:cursor-not-allowed
             transition-all duration-300 ease-in-out
             flex items-center justify-center space-x-2"
           >
             {uiState.loading ? 'Processing...' : 'Create Account'}
-            {!uiState.loading && <ArrowRight size={20} />}
+            {!uiState.loading && <ArrowRight size={18} />}
           </motion.button>
         </form>
       </motion.div>
 
-      {/* Gemini API Key Modal */}
+      {/* Gemini API Key Guide Modal */}
       <AnimatePresence>
         {uiState.showGeminiKeyModal && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-2xl p-8 max-w-2xl w-full space-y-6 shadow-2xl border border-blue-500/30"
             >
-              <h3 className="text-2xl font-bold mb-4">How to Get Gemini API Key</h3>
-              <ol className="space-y-2 mb-6 list-decimal list-inside text-gray-300">
-                <li>Visit <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">AI Studio</a></li>
-                <li>If first-time user, approve privacy requests</li>
-                <li>Click on "Create API Key"</li>
-                <li>Copy the generated key</li>
-                <li>Paste the key in the registration form</li>
-              </ol>
-              <div className="flex justify-end space-x-2">
-                <button 
-                  onClick={openGeminiKeyGuide}
-                  className="px-4 py-2 bg-blue-500/20 rounded-lg hover:bg-blue-500/30"
-                >
-                  Open AI Studio
-                </button>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
+                  Gemini API Key Guide
+                </h3>
                 <button 
                   onClick={() => setUiState(prev => ({...prev, showGeminiKeyModal: false}))}
-                  className="px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4 text-gray-300">
+                <div className="bg-gray-700/50 p-4 rounded-xl">
+                  <h4 className="text-xl font-semibold text-blue-400 mb-2">
+                    What is a Gemini API Key?
+                  </h4>
+                  <p>
+                    A Gemini API Key is a unique authentication token that allows you to access Google's Gemini AI services. 
+                    This key enables your application to interact with advanced AI capabilities.
+                  </p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-gray-700/50 p-4 rounded-xl">
+                    <h4 className="text-lg font-semibold text-green-400 mb-2">
+                      Why You Need It
+                    </h4>
+                    <ul className="list-disc list-inside space-y-2">
+                      <li>Access advanced AI functionalities</li>
+                      <li>Enable personalized AI interactions</li>
+                      <li>Secure and authenticated API requests</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-gray-700/50 p-4 rounded-xl">
+                    <h4 className="text-lg font-semibold text-purple-400 mb-2">
+                      How to Obtain
+                    </h4>
+                    <ol className="list-decimal list-inside space-y-2">
+                      <li>Visit <a 
+                        href="https://aistudio.google.com/apikey" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-400 underline hover:text-blue-300"
+                      >
+                        Google AI Studio
+                      </a></li>
+                      <li>Sign in with your Google account</li>
+                      <li>Click "Create API Key"</li>
+                      <li>Copy the generated key</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-500/20 border border-yellow-500 p-4 rounded-xl flex items-center">
+                  <Info className="mr-3 text-yellow-500" size={24} />
+                  <p>
+                    <strong>Important:</strong> Keep your API key confidential. 
+                    Do not share it publicly or commit it to version control.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4">
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={openGeminiKeyGuide}
+                  className="px-6 py-3 bg-blue-500/20 rounded-lg hover:bg-blue-500/30 
+                  flex items-center space-x-2 font-semibold"
+                >
+                  <span>Open AI Studio</span>
+                  <ArrowRight size={20} />
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setUiState(prev => ({...prev, showGeminiKeyModal: false}))}
+                  className="px-6 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 font-semibold"
                 >
                   Close
-                </button>
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>

@@ -146,9 +146,9 @@ function FrontPage() {
   }, []);
 
   const handleMascotClick = () => {
-    window.location.href = 'http://localhost:5174/';
+    window.open('http://localhost:5174/', '_blank');
   };
-
+  
   const closeModal = useCallback(() => {
     console.log('Closing modal');
     setActiveModal(null);
@@ -221,24 +221,22 @@ function FrontPage() {
             className={`w-16 h-16 ${
               activeMascot === 'default' ? 'text-blue-500' : 'text-purple-500'
             } transition-colors duration-300`}
-            onClick={() => {
-              setActiveMascot(activeMascot === 'default' ? 'active' : 'default');
-            }}
+              onClick={handleMascotClick}
           />
         </div>
         <AnimatePresence>
-          {activeMascot === 'active' && (
+          {activeMascot === 'default' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-full right-0 mb-4 p-4 bg-white/10 backdrop-blur-lg rounded-lg w-64"
+              className="absolute bottom-full right-0 mb-4 p-4 bg-white/10 backdrop-blur-lg rounded-lg w-24"
             >
-              <p className="text-sm text-white">Click on me to go to ChatMate and start chat with AI assistant! 👋</p>
+              <p className="text-sm text-white">Click to start chat with AI👋</p>
             </motion.div>
           )}
         </AnimatePresence>
-        <AnimatePresence>
+        {/* <AnimatePresence>
           {activeMascot === 'default' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -249,7 +247,7 @@ function FrontPage() {
               <p className="text-sm text-white">Hover to learn more about ChatMate 🤖</p>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence> */}
       </motion.div>
 
       {/* Hero Section */}

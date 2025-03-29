@@ -41,7 +41,7 @@ const LoginPage = () => {
     if (validateForm()) {
       try {
         setLoading(true);
-        const response = await axios.post('http://localhost:5000/login', {
+        const response = await axios.post(`${import.meta.env.VITE_BACKEND}/login`, {
           username: loginData.username,
           password: loginData.password
         });
