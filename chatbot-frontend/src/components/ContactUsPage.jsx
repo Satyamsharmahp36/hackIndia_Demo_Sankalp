@@ -99,7 +99,7 @@ function ContactUsPage() {
             <h2 className="text-2xl font-bold mb-4">Contact Information</h2>
             <div className="flex items-center space-x-4">
               <MapPin className="w-6 h-6 text-blue-500" />
-              <span>Chitkara University , Himachal Pradesh , India</span>
+              <span>Chitkara University Solan , India</span>
             </div>
             <div className="flex items-center space-x-4">
               <Phone className="w-6 h-6 text-green-500" />
