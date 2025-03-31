@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, Loader2, ExternalLink, Settings,ChevronDown , X,Trash2, Save, Lock, Unlock, AlertTriangle, Filter, Plus, CheckCircle, XCircle, Clock ,Info, HelpCircle } from 'lucide-react';
 import { getAnswer } from '../services/ai';
 import { motion, AnimatePresence } from 'framer-motion';
-import bcrypt from "bcryptjs";
-import ConfirmationModal from './ConfirmationModal';
+
 
 const apiService = {
   getPrompt: async (userId) => {
@@ -58,9 +57,7 @@ const apiService = {
   }
 };
 
-let savedUserId = "";
 
-console.log("final :- ", savedUserId);
 
 
 const ContributionForm = ({ isOpen, onClose, lastQuestion }) => {
@@ -240,14 +237,11 @@ const ContributionForm = ({ isOpen, onClose, lastQuestion }) => {
 
 
 const MessageContent = ({ content }) => {
-  // Regular expression to match URLs
   const urlRegex = /(https?:\/\/[^\s]+)/g;
 
-  // Function to convert URLs to markdown links
   const convertUrlsToLinks = (text) => {
     return text.split(urlRegex).map((part, index) => {
       if (part.match(urlRegex)) {
-        // Extract link text based on the platform
         const linkText = part.includes('linkedin.com') 
           ? 'LinkedIn Profile' 
           : 'Link';
@@ -299,11 +293,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('prompt'); 
   const [contributions, setContributions] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('');
-  // const userId = user?._id || '';
-  // const geminiApiKey = user?.geminiApiKey || '';
-  // const userPlan = user?.plan || 'free';
-  // const uniqueId= user?.username|| "";
+  const [statusFilter, setStatusFilter] = useState('')
   
   const checkPassword = () => {
     if (passwordInput === password) {
@@ -622,30 +612,30 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
                     </div>
                   </div>
                 ) : (
-<div className="space-y-6">
-  <div className="flex items-center justify-between bg-gray-800 p-4 rounded-lg shadow-md">
-    <h3 className="text-lg font-medium text-white flex items-center">
-      <User className="w-5 h-5 mr-2 text-blue-400" />
-      User Contributions
-    </h3>
-    
-    <div className="relative group">
-      <div className="flex items-center space-x-3 bg-gray-900 rounded-full px-4 py-2 border border-gray-700 hover:border-blue-500 transition-colors cursor-pointer">
-        <Filter className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition-colors" />
-        <select
-          value={statusFilter}
-          onChange={(e) => handleFilterChange(e.target.value)}
-          className="bg-black p-1 rounded-xl border-none text-white focus:outline-none text-sm font-medium cursor-pointer appearance-none w-full"
-        >
-          <option value="">All Contributions</option>
-          <option value="pending">Pending Review</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
-      </div>
-    </div>
-  </div>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between bg-gray-800 p-4 rounded-lg shadow-md">
+                <h3 className="text-lg font-medium text-white flex items-center">
+                  <User className="w-5 h-5 mr-2 text-blue-400" />
+                  User Contributions
+                </h3>
+                
+                <div className="relative group">
+                  <div className="flex items-center space-x-3 bg-gray-900 rounded-full px-4 py-2 border border-gray-700 hover:border-blue-500 transition-colors cursor-pointer">
+                    <Filter className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition-colors" />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => handleFilterChange(e.target.value)}
+                      className="bg-black p-1 rounded-xl border-none text-white focus:outline-none text-sm font-medium cursor-pointer appearance-none w-full"
+                    >
+                      <option value="">All Contributions</option>
+                      <option value="pending">Pending Review</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                  </div>
+                </div>
+              </div>
   
   <div 
     className="max-h-[70vh] overflow-y-auto pr-1 pb-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900"
@@ -798,8 +788,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
 };
 
 
-
-const ChatBot = ({ userName, userData, onRefetchUserData }) => {
+const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => {
   const savedUserId = localStorage.getItem('verifiedUserId');
 
   const [messages, setMessages] = useState(() => {
@@ -837,13 +826,11 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
     const savedUserId = localStorage.getItem('verifiedUserId');
     
     if (savedUserId) {
-      // Remove chat history for the specific user
       const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
       delete allChatHistories[savedUserId];
       localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
     }
 
-    // Reset messages to initial state with a personalized welcome message
     const initialMessage = {
       type: 'bot',
       content: `Hi${userName ? ' ' + userName : ''}! I'm ${userData.user.name} AI assistant. Feel free to ask me about my projects, experience, or skills!`,
@@ -852,13 +839,10 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
 
     setMessages([initialMessage]);
 
-    // Close confirmation modal
     setShowDeleteConfirmation(false);
     
-    // Show success modal
     setShowDeleteSuccessModal(true);
 
-    // Automatically hide success modal after 3 seconds
     setTimeout(() => {
       setShowDeleteSuccessModal(false);
     }, 3000);
@@ -879,6 +863,27 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
     }
   }, [userName]);
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    if (savedUserId && messages.length > 0) {
+      const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+      allChatHistories[savedUserId] = messages;
+      localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
+    }
+  }, [messages, savedUserId]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      scrollToBottom();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -897,8 +902,10 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
     setInput('');
     setIsLoading(true);
 
+    inputRef.current?.focus();
+
     try {
-      const response = await getAnswer(input, userData.user);
+      const response = await getAnswer(input, userData.user, presentUserData ? presentUserData.user : null);
       
       const botMessage = {
         type: 'bot',
@@ -921,7 +928,6 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
       setIsLoading(false);
     }
   };
-
 
   const DeleteConfirmationModal = () => (
     <AnimatePresence>
@@ -959,8 +965,6 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
     </AnimatePresence>
   );
 
-
-
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -978,6 +982,12 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
     } catch (error) {
       console.error('Error refetching user data:', error);
     }
+  };
+
+  const autoResizeTextarea = (e) => {
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
   };
 
   return (
@@ -1008,7 +1018,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" id="chat-messages-container">
         <AnimatePresence>
           {promptUpdated && (
             <motion.div
@@ -1104,8 +1114,12 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
         <div className="flex items-end p-4 border-t border-gray-700">
           <div className="relative flex items-center w-full rounded-lg bg-gray-800 p-2">
             <textarea
+              ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                autoResizeTextarea(e);
+              }}
               onKeyDown={handleKeyPress}
               placeholder={`Ask me anything about ${userData.user.name} ...`}
               className="flex-1 bg-transparent outline-none resize-none text-white placeholder-gray-400 max-h-32"
@@ -1171,7 +1185,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData }) => {
         lastQuestion={lastQuestion}
       />
 
-<DeleteConfirmationModal />
+      <DeleteConfirmationModal />
 
     </div>
   );

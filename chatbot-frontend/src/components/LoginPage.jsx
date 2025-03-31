@@ -46,11 +46,9 @@ const LoginPage = () => {
           password: loginData.password
         });
 
-        // Store user ID in local storage
         localStorage.setItem('userId', response.data.userId);
         localStorage.setItem('userPlan', response.data.plan);
         
-        // Redirect to dashboard or next page
         alert('Login Successful!');
       } catch (error) {
         alert(error.response?.data?.message || 'Login failed');
@@ -73,7 +71,6 @@ const LoginPage = () => {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username Input */}
           <div>
             <input 
               type="text"
@@ -88,7 +85,6 @@ const LoginPage = () => {
             {errors.username && <p className="text-red-500 text-sm mt-1">{errors.username}</p>}
           </div>
 
-          {/* Password Input */}
           <div className="relative">
             <input 
               type={showPassword ? "text" : "password"}
@@ -110,7 +106,6 @@ const LoginPage = () => {
             {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
           </div>
 
-          {/* Submit Button */}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}

@@ -19,7 +19,6 @@ function ContactUsPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Implement form submission logic
     console.log('Form submitted:', formData);
     alert('Thank you for your message! We will get back to you soon.');
   };
@@ -37,7 +36,6 @@ function ContactUsPage() {
         </h1>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Contact Form */}
           <motion.div
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
@@ -92,7 +90,6 @@ function ContactUsPage() {
             </form>
           </motion.div>
 
-          {/* Contact Information */}
           <motion.div
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}

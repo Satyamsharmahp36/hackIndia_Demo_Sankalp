@@ -23,7 +23,6 @@ const SignupPage = () => {
     geminiApiKey: ''
   });
 
-  // Enhanced UI State
   const [uiState, setUiState] = useState({
     showPassword: false,
     showGeminiKeyModal: false,
@@ -33,10 +32,8 @@ const SignupPage = () => {
     globalError: null
   });
 
-  // Centralized error state
   const [errors, setErrors] = useState({});
 
-  // Animation Configurations
   const inputVariants = {
     initial: { 
       opacity: 0, 
@@ -74,7 +71,6 @@ const SignupPage = () => {
     }
   };
 
-  // Advanced Form Validation
   const validateForm = useCallback(() => {
     const newErrors = {};
     const validationRules = {
@@ -112,7 +108,6 @@ const SignupPage = () => {
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
-  // Input Change Handler
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -159,7 +154,6 @@ const SignupPage = () => {
     }
   };
 
-  // Utility Functions
   const openGeminiKeyGuide = () => {
     window.open('https://aistudio.google.com/apikey', '_blank');
   };
@@ -168,7 +162,6 @@ const SignupPage = () => {
     window.open('https://chatoomate.vercel.app/', '_blank');
   };
 
-  // Render Input Fields
   const renderInputField = (field, index) => {
     const fieldConfig = {
       name: { label: "Full Name", type: "text" },
@@ -305,7 +298,6 @@ const SignupPage = () => {
         </form>
       </motion.div>
 
-      {/* Gemini API Key Guide Modal */}
       <AnimatePresence>
         {uiState.showGeminiKeyModal && (
           <motion.div 
@@ -409,7 +401,6 @@ const SignupPage = () => {
         )}
       </AnimatePresence>
 
-      {/* Success Modal */}
       <AnimatePresence>
         {uiState.showSuccessModal && (
           <motion.div 

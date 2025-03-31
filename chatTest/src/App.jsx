@@ -37,29 +37,16 @@ const App = () => {
   };
 
   const handleLogout = () => {
-    // Clear session and local storage
     sessionStorage.removeItem('hasStartedChat');
     sessionStorage.removeItem('userData');
     localStorage.removeItem('verifiedUserId');
     
-    // Reset states
     setShowChat(false);
     setUserData(null);
     setUserName('');
   };
 
-  useEffect(() => {
-    const keepAlive = setInterval(() => {
-      if (userData) {
-        fetch(`${import.meta.env.VITE_BACKEND}/prompt/${userData.user._id}`)
-          .then((res) => res.json())
-          .then((data) => console.log('Server kept alive:', data))
-          .catch((err) => console.error('Error keeping server alive:', err));
-      }
-    }, 100000);
 
-    return () => clearInterval(keepAlive);
-  }, [userData]);
 
   return (
     <div className="min-h-screen bg-gray-900">

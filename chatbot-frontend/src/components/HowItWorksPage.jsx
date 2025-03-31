@@ -15,7 +15,7 @@ function ChatMateDocumentation() {
   const [activeSection, setActiveSection] = useState(null);
 
   const handleClick = () => {
-    window.open('http://localhost:5174/', '_blank');
+    window.open('https://chatoomate.vercel.app/', '_blank');
   };
 
   const documentationSections = [

@@ -5,7 +5,6 @@ const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 const axios = require('axios');
 
-
 dotenv.config();
 
 const app = express();
@@ -25,6 +24,10 @@ const userSchema = new mongoose.Schema({
   geminiApiKey: { type: String, required: true },
   plan: { type: String, enum: ['free', 'pro'], default: 'free' },
   prompt: { type: String, default: '' },
+  dailyTasks: {
+    content: { type: String, default: '' },
+    lastUpdated: { type: Date, default: Date.now }
+  },
   contributions: [{
     name: String,
     question: String,
@@ -32,10 +35,32 @@ const userSchema = new mongoose.Schema({
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
   }],
+  tasks: [{
+    uniqueTaskId: { type: String, required: true }, 
+    taskQuestion: { type: String, required: true },
+    taskDescription: { type: String, default: 'Task request' },
+    status: { type: String, enum: ['pending', 'inprogress', 'completed', 'cancelled'], default: 'inprogress' },
+    presentUserData: { type: mongoose.Schema.Types.Mixed },
+    createdAt: { type: Date, default: Date.now }
+  }],
   createdAt: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model('User', userSchema);
+
+
+
+function generateUniqueTaskId() {
+  const now = new Date();
+  const seconds = now.getSeconds().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const hours = now.getHours().toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
+  const month = (now.getMonth() + 1).toString().padStart(2, '0'); 
+  const year = now.getFullYear();
+  
+  return `${seconds}${minutes}${hours}${day}${month}${year}`;
+}
 
 app.post('/register', async (req, res) => {
   try {
@@ -52,7 +77,6 @@ app.post('/register', async (req, res) => {
     res.status(500).json({ message: "Error registering user", error: error.message });
   }
 });
-
 
 app.post('/login', async (req, res) => {
   try {
@@ -83,7 +107,6 @@ app.post('/update-prompt', async (req, res) => {
       return res.status(400).json({ message: "User ID is required" });
     }
 
-    // Find user by username instead of _id
     const user = await User.findOne({ username: userId });
 
     if (!user) {
@@ -99,13 +122,55 @@ app.post('/update-prompt', async (req, res) => {
   }
 });
 
+app.get('/daily-tasks/:username', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    
+    res.json({ 
+      content: user.dailyTasks.content || "",
+      lastUpdated: user.dailyTasks.lastUpdated 
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching daily tasks", error: error.message });
+  }
+});
+
+app.post('/update-daily-tasks', async (req, res) => {
+  try {
+    const { content, username } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ message: "Username is required" });
+    }
+
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.dailyTasks = {
+      content,
+      lastUpdated: new Date()
+    };
+    
+    await user.save();
+
+    res.json({ 
+      message: "Daily tasks updated successfully",
+      dailyTasks: user.dailyTasks
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating daily tasks", error: error.message });
+  }
+});
+
 app.post('/contributions', async (req, res) => {
   try {
     const { name, question, answer, username } = req.body;
-    console.log(username)
     const user = await User.findOne({ username });
     if (!user) return res.status(404).json({ message: "User not found" });
-
     const contribution = { name, question, answer, status: 'pending', createdAt: new Date() };
     user.contributions.push(contribution);
     await user.save();
@@ -142,11 +207,189 @@ app.patch('/contributions/:contributionId', async (req, res) => {
   }
 });
 
+app.post('/find-task-by-question', async (req, res) => {
+  try {
+    const { userId, taskQuestion, uniqueTaskId } = req.body;
+    
+    if (!userId || (!taskQuestion && !uniqueTaskId)) {
+      return res.status(400).json({ message: "User ID and either task question or uniqueTaskId are required" });
+    }
+    
+    const user = await User.findOne({ username: userId });
+    if (!user) return res.status(404).json({ message: "User not found" });
+        let task;
+    if (uniqueTaskId) {
+      task = user.tasks.find(task => task.uniqueTaskId === uniqueTaskId);
+    } else {
+      task = user.tasks.find(task => task.taskQuestion === taskQuestion);
+    }
+    
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    
+    res.json({ 
+      message: "Task found", 
+      task 
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error finding task", error: error.message });
+  }
+});
+
+app.post('/create-task', async (req, res) => {
+  try {
+    const { userId, taskQuestion, taskDescription, status, presentUserData , uniqueTaskId } = req.body;
+    
+    if (!userId || !taskQuestion) {
+      return res.status(400).json({ message: "User ID and task question are required" });
+    }
+
+    const user = await User.findOne({ username: userId });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const taskId = uniqueTaskId || generateUniqueTaskId();
+
+
+    
+    const newTask = {
+      uniqueTaskId: taskId,
+      taskQuestion,
+      taskDescription: taskDescription || 'Task request',
+      status: status || 'inprogress',
+      presentUserData,
+      createdAt: new Date()
+    };
+    
+    user.tasks.push(newTask);
+    await user.save();
+    
+    
+    res.status(201).json({ 
+      message: "Task created successfully", 
+      task: {
+        id: user.tasks[user.tasks.length - 1]._id,
+        uniqueTaskId,
+        ...newTask
+      } 
+    });
+  } catch (error) {
+    console.error('Error creating task:', error);
+    res.status(500).json({ message: "Error creating task", error: error.message });
+  }
+});
+
+app.get('/tasks/:userId', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.userId });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    
+    res.json(user.tasks.sort((a, b) => b.createdAt - a.createdAt));
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching tasks", error: error.message });
+  }
+});
+
+app.patch('/tasks', async (req, res) => {
+  try {
+    const { status, userId, uniqueTaskId } = req.body;
+    
+    if (!status || !userId) {
+      return res.status(400).json({ message: "Task status and User ID are required" });
+    }
+    
+    const user = await User.findOne({ username: userId });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    let taskIndex = -1;
+    
+    if (uniqueTaskId) {
+      taskIndex = user.tasks.findIndex(task => task.uniqueTaskId === uniqueTaskId);
+    }
+    
+    if (taskIndex === -1) {
+      const taskId = req.params.taskId;
+      taskIndex = user.tasks.findIndex(task => task._id.toString() === taskId);
+    }
+    
+    if (taskIndex === -1) {
+      const taskFromRequest = req.body.taskQuestion;
+      if (taskFromRequest) {
+        taskIndex = user.tasks.findIndex(task => task.taskQuestion === taskFromRequest);
+      }
+    }
+    
+    if (taskIndex === -1) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    
+    user.tasks[taskIndex].status = status;
+    await user.save();
+    
+    res.json({ 
+      message: "Task status updated successfully", 
+      task: user.tasks[taskIndex] 
+    });
+  } catch (error) {
+    console.error("Error updating task status:", error);
+    res.status(500).json({ message: "Error updating task status", error: error.message });
+  }
+});
+
+app.delete('/tasks/:taskId', async (req, res) => {
+  try {
+    const { userId, uniqueTaskId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+    
+    const user = await User.findOne({ username: userId });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    let taskIndex = -1;
+    
+    if (uniqueTaskId) {
+      taskIndex = user.tasks.findIndex(task => task.uniqueTaskId === uniqueTaskId);
+    }
+    
+    if (taskIndex === -1) {
+      taskIndex = user.tasks.findIndex(task => task._id.toString() === req.params.taskId);
+    }
+    
+    if (taskIndex === -1) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    
+    user.tasks.splice(taskIndex, 1);
+    await user.save();
+    
+    res.json({ message: "Task deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting task", error: error.message });
+  }
+});
+
 app.get('/verify-user/:identifier', async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.identifier });
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json({ user: { _id: user._id, name: user.name, username: user.username, geminiApiKey: user.geminiApiKey, plan: user.plan, prompt: user.prompt, contributions: user.contributions,password : user.password } });
+    res.json({ 
+      user: { 
+        _id: user._id, 
+        name: user.name, 
+        username: user.username,
+        email: user.email,
+        mobileNo: user.mobileNo,
+        geminiApiKey: user.geminiApiKey, 
+        plan: user.plan, 
+        prompt: user.prompt,
+        dailyTasks: user.dailyTasks, 
+        contributions: user.contributions,
+        tasks: user.tasks,
+        password: user.password 
+      } 
+    });
   } catch (error) {
     res.status(500).json({ message: "Error verifying user", error: error.message });
   }

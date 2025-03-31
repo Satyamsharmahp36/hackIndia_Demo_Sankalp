@@ -6,25 +6,21 @@ import {
   Zap, Coffee 
 } from 'lucide-react';
 
-// Import page components
 import SignupPage from './SignupPage';
 import LoginPage from './LoginPage';
 import ContactUsPage from './ContactUsPage';
 import HowItWorksPage from './HowItWorksPage';
 
 function FrontPage() {
-  // State management
   const [activeMascot, setActiveMascot] = useState('default');
   const [activeModal, setActiveModal] = useState(null);
   
-  // Refs and scroll effects
   const containerRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"]
   });
 
-  // Particle Background Component
   const ParticleBackground = () => {
     const [particles, setParticles] = useState([]);
   
@@ -92,7 +88,6 @@ function FrontPage() {
     );
   };
 
-  // Gradient Text Component
   const TextGradient = ({ children, className = '' }) => {
     return (
       <motion.div
@@ -106,7 +101,6 @@ function FrontPage() {
     );
   };
 
-  // Animation Variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -139,14 +133,13 @@ function FrontPage() {
     }
   };
 
-  // Modal Management
   const openModal = useCallback((modalType) => {
     console.log(`Opening modal: ${modalType}`);
     setActiveModal(modalType);
   }, []);
 
   const handleMascotClick = () => {
-    window.open('http://localhost:5174/', '_blank');
+    window.open('https://chatoomate.vercel.app/', '_blank');
   };
   
   const closeModal = useCallback(() => {
@@ -154,11 +147,9 @@ function FrontPage() {
     setActiveModal(null);
   }, []);
 
-  // Parallax Scroll Effects
   const y1 = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const y2 = useTransform(scrollYProgress, [0, 1], [0, -50]);
 
-  // Modal Rendering
   const modalComponents = {
     signup: <SignupPage />,
     login: <LoginPage />,
@@ -171,10 +162,8 @@ function FrontPage() {
       ref={containerRef}
       className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white relative overflow-hidden"
     >
-      {/* Particle Background */}
       <ParticleBackground />
 
-      {/* Animated Modals */}
       <AnimatePresence>
         {activeModal && (
           <motion.div 
@@ -201,7 +190,6 @@ function FrontPage() {
         )}
       </AnimatePresence>
 
-      {/* Interactive Mascot */}
       <motion.div
         style={{ y: y1 }}
         className="fixed bottom-8 right-8 z-50 cursor-pointer group"
@@ -236,21 +224,9 @@ function FrontPage() {
             </motion.div>
           )}
         </AnimatePresence>
-        {/* <AnimatePresence>
-          {activeMascot === 'default' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-full right-0 mb-4 p-4 bg-white/10 backdrop-blur-lg rounded-lg w-64"
-            >
-              <p className="text-sm text-white">Hover to learn more about ChatMate 🤖</p>
-            </motion.div>
-          )}
-        </AnimatePresence> */}
+        
       </motion.div>
 
-      {/* Hero Section */}
       <motion.div
         className="container mx-auto px-4 py-20 relative z-20"
         initial="hidden"
@@ -345,7 +321,6 @@ function FrontPage() {
         </div>
       </motion.div>
 
-      {/* Use Cases Section */}
       <motion.div
         className="container mx-auto px-4 py-20"
         initial="hidden"
@@ -421,7 +396,6 @@ function FrontPage() {
         </div>
       </motion.div>
 
-      {/* Pricing Section */}
       <motion.div
         className="container mx-auto px-4 py-20"
         initial="hidden"
@@ -436,7 +410,6 @@ function FrontPage() {
           Choose Your Plan
         </motion.h2>
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Free Plan */}
           <motion.div
             variants={itemVariants}
             whileHover={{ scale: 1.02 }}
@@ -472,7 +445,6 @@ function FrontPage() {
             </div>
           </motion.div>
 
-          {/* Pro Plan */}
           <motion.div
             variants={itemVariants}
             whileHover={{ scale: 1.05 }}
@@ -518,7 +490,6 @@ function FrontPage() {
         </div>
       </motion.div>
 
-      {/* Footer */}
       <motion.footer
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
