@@ -51,7 +51,7 @@ const AdminPanel = ({ userData, onClose }) => {
       fetchTasks();
     } else {
       setPasswordError('Incorrect password');
-      toast.error('Incorrect password');
+      toast.error('Incorrect passkey');
     }
   };
 
