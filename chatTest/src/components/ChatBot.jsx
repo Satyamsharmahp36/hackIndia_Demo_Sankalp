@@ -787,15 +787,14 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
   );
 };
 
-
 const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => {
-  const savedUserId = localStorage.getItem('verifiedUserId');
+  const chatHistoryKey = `${userName || 'anonymous'}_${userData.user.name}`;
 
   const [messages, setMessages] = useState(() => {
     const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
     
-    const userChatHistory = savedUserId && allChatHistories[savedUserId] 
-      ? allChatHistories[savedUserId] 
+    const userChatHistory = allChatHistories[chatHistoryKey] 
+      ? allChatHistories[chatHistoryKey] 
       : [
           {
             type: 'bot',
@@ -823,13 +822,9 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
   };
 
   const handleConfirmDeleteHistory = () => {
-    const savedUserId = localStorage.getItem('verifiedUserId');
-    
-    if (savedUserId) {
-      const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
-      delete allChatHistories[savedUserId];
-      localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
-    }
+    const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+    delete allChatHistories[chatHistoryKey];
+    localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
 
     const initialMessage = {
       type: 'bot',
@@ -838,9 +833,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
     };
 
     setMessages([initialMessage]);
-
     setShowDeleteConfirmation(false);
-    
     setShowDeleteSuccessModal(true);
 
     setTimeout(() => {
@@ -851,29 +844,44 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
   useEffect(() => {
     if (!userName) {
       const storedName = sessionStorage.getItem('userName');
-      if (storedName && messages.length === 1 && messages[0].type === 'bot') {
-        setMessages([
-          {
-            type: 'bot',
-            content: `Hi ${storedName}! I'm ${userData.user.name}'s AI assistant. Feel free to ask me about my projects, experience, or skills!`,
-            timestamp: new Date().toISOString()
-          }
-        ]);
+      if (storedName) {
+        const updatedChatHistoryKey = `${storedName}_${userData.user.name}`;
+        const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+        
+        if (allChatHistories[updatedChatHistoryKey]) {
+          setMessages(allChatHistories[updatedChatHistoryKey]);
+        } else if (messages.length === 1 && messages[0].type === 'bot') {
+          setMessages([
+            {
+              type: 'bot',
+              content: `Hi ${storedName}! I'm ${userData.user.name}'s AI assistant. Feel free to ask me about my projects, experience, or skills!`,
+              timestamp: new Date().toISOString()
+            }
+          ]);
+        }
       }
     }
-  }, [userName]);
+  }, [userName, userData.user.name]);
+
+  useEffect(() => {
+    const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+    
+    if (allChatHistories[chatHistoryKey]) {
+      setMessages(allChatHistories[chatHistoryKey]);
+    }
+  }, [chatHistoryKey]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   useEffect(() => {
-    if (savedUserId && messages.length > 0) {
+    if (messages.length > 0) {
       const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
-      allChatHistories[savedUserId] = messages;
+      allChatHistories[chatHistoryKey] = messages;
       localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
     }
-  }, [messages, savedUserId]);
+  }, [messages, chatHistoryKey]);
 
   useEffect(() => {
     const handleResize = () => {
