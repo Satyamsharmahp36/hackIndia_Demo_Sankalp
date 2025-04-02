@@ -121,6 +121,15 @@ export async function getAnswer(question, userData, presentData) {
       return "No Gemini API key available for this user.";
     }
 
+    const approvedContributions = userData.contributions?.filter(contribution => 
+      contribution.status === "approved") || [];
+
+      console.log(approvedContributions)
+      const contributionsKnowledgeBase = approvedContributions.length > 0 ? 
+      `This is my personal knowledge base of verified information. you can use this to answer the questions
+${approvedContributions.map((c, index) => `[${index + 1}] Question: ${c.question}\nAnswer: ${c.answer}`).join('\n\n')}` : 
+      'No specific approved contributions yet.';
+
     const taskDetection = await detectTaskRequest(question, userData);
     
     if (taskDetection.isTask) {
@@ -154,8 +163,10 @@ And this is daily task of user ${userData.dailyTasks.content}
 
 Question: ${question}
 
-Answer questions in a bit elaborate manner and make it sound good but if question is straight forward then give direct answers to that.
+${contributionsKnowledgeBase}
 When providing links, give plain URLs like https://github.com/xxxx/
+
+This is the way I want the responses to be ${userData.userPrompt}
 `;
 
     const model = genAI.getGenerativeModel({ 

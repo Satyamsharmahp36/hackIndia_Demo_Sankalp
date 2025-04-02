@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, ExternalLink, Settings,ChevronDown , X,Trash2, Save, Lock, Unlock, AlertTriangle, Filter, Plus, CheckCircle, XCircle, Clock ,Info, HelpCircle } from 'lucide-react';
+import { Send, User, Bot, Loader2,MessageCircle ,LightbulbIcon , ExternalLink, Settings,ChevronDown , X,Trash2, Save, Lock, Unlock, AlertTriangle, Filter, Plus, CheckCircle, XCircle, Clock ,Info, HelpCircle } from 'lucide-react';
 import { getAnswer } from '../services/ai';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -9,6 +9,39 @@ const apiService = {
     const response = await fetch(`${import.meta.env.VITE_BACKEND}/prompt/${userId}`);
     const data = await response.json();
     return data.prompt;
+  },
+
+  getUserPrompt: async (userId) => {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND}/user-prompt/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    const data = await response.json();
+    return data.prompt;
+  },
+  
+  updateUserPrompt: async (content, userId) => {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND}/update-user-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content, userId }),
+    });
+    return await response.json();
+  },
+  
+  clearUserPrompt: async (userId) => {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND}/update-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content: '', userId }),
+    });
+    return await response.json();
   },
   
   updatePrompt: async (content, userId) => {
@@ -284,21 +317,23 @@ const TypingEffect = ({ text }) => {
 };
 
 
-const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
+const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
   const [passwordInput, setPasswordInput] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [promptContent, setPromptContent] = useState('');
+  const [responseStyleContent, setResponseStyleContent] = useState(''); 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('prompt'); 
   const [contributions, setContributions] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('');
   
   const checkPassword = () => {
     if (passwordInput === password) {
       setAuthenticated(true);
       fetchPrompt();
+      fetchResponseStyle(); 
       fetchContributions();
     } else {
       setError('Invalid password');
@@ -318,11 +353,24 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
       setIsLoading(false);
     }
   };
+
+  const fetchResponseStyle = async () => {
+    setIsLoading(true);
+    try {
+      const styleData = await apiService.getUserPrompt(localStorage.getItem('verifiedUserId'));
+      setResponseStyleContent(styleData || '');
+    } catch (err) {
+      setError('Failed to fetch response style');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const fetchContributions = async (status = '') => {
     setIsLoading(true);
     try {
-      const data = await apiService.getContributions(localStorage.getItem('verifiedUserId'),status || null);
+      const data = await apiService.getContributions(localStorage.getItem('verifiedUserId'), status || null);
       setContributions(data);
     } catch (err) {
       setError('Failed to fetch contributions');
@@ -332,15 +380,40 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
     }
   };
   
-  const updatePrompte = async () => {
+  const updatePrompt = async () => {
     setIsLoading(true);
     try {
-      await apiService.updatePrompt(promptContent,localStorage.getItem('verifiedUserId'));
+      await apiService.updatePrompt(promptContent, localStorage.getItem('verifiedUserId'));
       setSuccessMessage('Prompt updated successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
       onPromptUpdated();
     } catch (err) {
       setError('Failed to update prompt');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateResponseStyle = async () => {
+    setIsLoading(true);
+    try {
+      const userId = localStorage.getItem('verifiedUserId');
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+      
+      await apiService.updateUserPrompt(responseStyleContent, userId);
+      
+      setSuccessMessage('Response style updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      if (typeof onPromptUpdated === 'function') {
+        onPromptUpdated();
+      }
+    } catch (err) {
+      console.error('Error updating response style:', err);
+      setError(`Failed to update response style: ${err.message || 'Unknown error'}`);
       setTimeout(() => setError(''), 3000);
     } finally {
       setIsLoading(false);
@@ -364,11 +437,39 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
       }
     }
   };
+
+  const clearResponseStyle = async () => {
+    if (window.confirm('Are you sure you want to clear the response style?')) {
+      setIsLoading(true);
+      try {
+        const userId = localStorage.getItem('verifiedUserId');
+        if (!userId) {
+          throw new Error('User ID not found');
+        }
+        
+        await apiService.clearUserPrompt(userId);
+        setResponseStyleContent('');
+        setSuccessMessage('Response style cleared successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        
+        if (typeof onPromptUpdated === 'function') {
+          onPromptUpdated();
+        }
+      } catch (err) {
+        console.error('Error clearing response style:', err);
+        setError(`Failed to clear response style: ${err.message || 'Unknown error'}`);
+        setTimeout(() => setError(''), 3000);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
   
   const updateContributionStatuse = async (id, status) => {
     setIsLoading(true);
     try {
-      await apiService.updateContributionStatus(id, status,localStorage.getItem('verifiedUserId'));
+      await apiService.updateContributionStatus(id, status, localStorage.getItem('verifiedUserId'));
+      onPromptUpdated();
       fetchContributions(statusFilter);
       setSuccessMessage(`Contribution ${status}`);
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -389,6 +490,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
     setAuthenticated(false);
     setPasswordInput('');
     setPromptContent('');
+    setResponseStyleContent('');
     setError('');
     setSuccessMessage('');
     setActiveTab('prompt');
@@ -434,9 +536,9 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
           </motion.button>
         </div>
         
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {!authenticated ? (
-            <div className="p-8 space-y-6 flex flex-col items-center">
+            <div className="p-8 space-y-6 flex flex-col items-center overflow-y-auto">
               <motion.div 
                 animate={{ 
                   boxShadow: ["0 0 0 rgba(59, 130, 246, 0)", "0 0 15px rgba(59, 130, 246, 0.5)", "0 0 0 rgba(59, 130, 246, 0)"] 
@@ -509,6 +611,19 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
                   </div>
                 </button>
                 <button
+                  onClick={() => setActiveTab('responseStyle')}
+                  className={`px-6 py-4 text-sm font-medium transition-all ${
+                    activeTab === 'responseStyle'
+                      ? 'border-b-2 border-blue-500 text-blue-400 bg-gray-900 bg-opacity-30'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-700 hover:bg-opacity-30'
+                  } rounded-t-lg`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Response Style</span>
+                  </div>
+                </button>
+                <button
                   onClick={() => setActiveTab('contributions')}
                   className={`px-6 py-4 text-sm font-medium transition-all ${
                     activeTab === 'contributions'
@@ -523,7 +638,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
                 </button>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 relative">
                 {isLoading && (
                   <div className="absolute inset-0 bg-black bg-opacity-50 flex justify-center items-center z-10">
                     <motion.div
@@ -566,7 +681,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
                 
                 {activeTab === 'prompt' ? (
                   <div className="space-y-6">
-                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-y-scroll shadow-lg">
+                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
                       <div className="bg-gray-900 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
                         <h3 className="text-white font-medium flex items-center">
                           <Bot className="w-5 h-5 mr-2 text-blue-400" />
@@ -591,7 +706,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
                       <motion.button
                         whileHover={{ scale: 1.02, y: -2 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={updatePrompte}
+                        onClick={updatePrompt}
                         disabled={isLoading}
                         className="flex-1 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg shadow-lg hover:shadow-blue-500/30 transition-all font-medium flex items-center justify-center"
                       >
@@ -611,172 +726,250 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated,password }) => {
                       </motion.button>
                     </div>
                   </div>
+                ) : activeTab === 'responseStyle' ? (
+                  <div className="space-y-6">
+                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
+                      <div className="bg-gray-900 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
+                        <h3 className="text-white font-medium flex items-center">
+                          <MessageCircle className="w-5 h-5 mr-2 text-purple-400" />
+                          Response Style Configuration
+                        </h3>
+                        <div className="flex items-center text-xs text-gray-400">
+                          <Clock className="w-4 h-4 mr-1" />
+                          Last updated: Today
+                        </div>
+                      </div>
+
+                      <div className="p-2 bg-gray-900 bg-opacity-50">
+                        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm text-gray-300 mb-3">
+                          <div className="flex items-start mb-2">
+                            <Info className="w-5 h-5 text-blue-400 mr-2 flex-shrink-0 mt-0.5" />
+                            <p>Define how you want the AI model to respond. You specific behaviors like being funny, concise, or strict about certain topics.</p>
+                          </div>
+                        </div>
+                        <textarea
+                          value={responseStyleContent}
+                          onChange={(e) => setResponseStyleContent(e.target.value)}
+                          className="w-full p-3 bg-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-purple-500 rounded-lg h-48 resize-none font-mono text-sm border border-gray-700"
+                          placeholder="Define how you want the AI to respond (e.g., funny, precise, strict, etc.)..."
+                        />
+                      </div>
+                    </div>
+                    <div className="flex space-x-4">
+                      <motion.button
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={updateResponseStyle}
+                        disabled={isLoading}
+                        className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-lg shadow-lg hover:shadow-purple-500/30 transition-all font-medium flex items-center justify-center"
+                      >
+                        <Save className="w-5 h-5 mr-2" />
+                        <span>{isLoading ? 'Saving...' : 'Save Response Style'}</span>
+                      </motion.button>
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={clearResponseStyle}
+                        disabled={isLoading}
+                        className="py-4 px-6 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg hover:from-red-700 hover:to-red-600 shadow-lg hover:shadow-red-500/30 transition-all font-medium flex items-center justify-center"
+                      >
+                        <X className="w-5 h-5 mr-2" />
+                        <span>{isLoading ? 'Clearing...' : 'Clear'}</span>
+                      </motion.button>
+                    </div>
+
+                    
+                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
+                      <div className="bg-gray-900 px-4 py-3 border-b border-gray-700">
+                        <h3 className="text-white font-medium flex items-center">
+                          <Settings className="w-5 h-5 mr-2 text-purple-400" />
+                          Quick Templates
+                        </h3>
+                      </div>
+                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {[
+                          { name: "Professional", desc: "Formal, precise responses with authoritative tone" },
+                          { name: "Friendly", desc: "Casual, warm tone with conversational style" },
+                          { name: "Concise", desc: "Brief, direct responses without unnecessary details" },
+                          { name: "Educational", desc: "Explanatory style with examples and definitions" },
+                          { name: "Creative", desc: "Imaginative responses with metaphors and analogies" },
+                          { name: "Technical", desc: "Detailed technical explanations with terminology" }
+                        ].map((template, idx) => (
+                          <motion.div
+                            key={idx}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setResponseStyleContent(prevContent => 
+                              `${template.name.toUpperCase()} STYLE: ${template.desc}. ${prevContent ? '\n\nAdditional instructions: ' + prevContent : ''}`
+                            )}
+                            className="bg-gray-900 border border-gray-700 hover:border-purple-500 rounded-lg p-3 cursor-pointer transition-all"
+                          >
+                            <div className="font-medium text-white mb-1">{template.name}</div>
+                            <div className="text-sm text-gray-400">{template.desc}</div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between bg-gray-800 p-4 rounded-lg shadow-md">
-                <h3 className="text-lg font-medium text-white flex items-center">
-                  <User className="w-5 h-5 mr-2 text-blue-400" />
-                  User Contributions
-                </h3>
-                
-                <div className="relative group">
-                  <div className="flex items-center space-x-3 bg-gray-900 rounded-full px-4 py-2 border border-gray-700 hover:border-blue-500 transition-colors cursor-pointer">
-                    <Filter className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition-colors" />
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => handleFilterChange(e.target.value)}
-                      className="bg-black p-1 rounded-xl border-none text-white focus:outline-none text-sm font-medium cursor-pointer appearance-none w-full"
-                    >
-                      <option value="">All Contributions</option>
-                      <option value="pending">Pending Review</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between bg-gray-800 p-4 rounded-lg shadow-md">
+                      <h3 className="text-lg font-medium text-white flex items-center">
+                        <User className="w-5 h-5 mr-2 text-blue-400" />
+                        User Contributions
+                      </h3>
+                      
+                      <div className="relative group">
+                        <div className="flex items-center space-x-3 bg-gray-900 rounded-full px-4 py-2 border border-gray-700 hover:border-blue-500 transition-colors cursor-pointer">
+                          <Filter className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition-colors" />
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => handleFilterChange(e.target.value)}
+                            className="bg-transparent border-none text-white focus:outline-none text-sm font-medium cursor-pointer appearance-none w-full"
+                          >
+                            <option value="">All Contributions</option>
+                            <option value="pending">Pending Review</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {contributions.length === 0 ? (
+                        <div className="text-center py-12 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700">
+                          <motion.div 
+                            animate={{ 
+                              opacity: [0.5, 1, 0.5],
+                              scale: [0.98, 1, 0.98]
+                            }}
+                            transition={{ duration: 3, repeat: Infinity }}
+                            className="flex justify-center mb-4"
+                          >
+                            <User className="w-16 h-16 text-gray-600" />
+                          </motion.div>
+                          <p className="text-gray-400 text-lg font-medium">No contributions found</p>
+                          <p className="text-gray-500 text-sm mt-2">User submissions will appear here</p>
+                        </div>
+                      ) : (
+                        contributions.map((contribution, index) => (
+                          <motion.div 
+                            key={contribution._id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`border rounded-xl overflow-hidden shadow-lg ${
+                              contribution.status === 'approved' 
+                                ? 'border-green-600 bg-gradient-to-r from-gray-900 to-green-900 bg-opacity-10' 
+                                : contribution.status === 'rejected'
+                                  ? 'border-red-600 bg-gradient-to-r from-gray-900 to-red-900 bg-opacity-10'
+                                  : 'border-yellow-600 bg-gradient-to-r from-gray-900 to-yellow-900 bg-opacity-10'
+                            } ${index === contributions.length - 1 ? 'mb-4' : ''}`}
+                          >
+                            <div className="flex justify-between items-center p-4 border-b border-gray-700">
+                              <div className="flex items-center space-x-3">
+                                <div className="bg-blue-900 bg-opacity-30 rounded-full p-2">
+                                  <User className="w-5 h-5 text-blue-400" />
+                                </div>
+                                <div>
+                                  <span className="font-medium text-white">{contribution.name}</span>
+                                  <div className="text-xs text-gray-400 mt-1">
+                                    {new Date(contribution.createdAt).toLocaleDateString()} • 
+                                    {new Date(contribution.createdAt).toLocaleTimeString()}
+                                  </div>
+                                </div>
+                              </div>
+                              <div>
+                                <span 
+                                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    contribution.status === 'approved' 
+                                      ? 'bg-green-900 bg-opacity-30 text-green-300 border border-green-600' 
+                                      : contribution.status === 'rejected'
+                                        ? 'bg-red-900 bg-opacity-30 text-red-300 border border-red-600'
+                                        : 'bg-yellow-900 bg-opacity-30 text-yellow-300 border border-yellow-600'
+                                  }`}
+                                >
+                                  {contribution.status === 'approved' ? '✓ Approved' : 
+                                  contribution.status === 'rejected' ? '× Rejected' : 
+                                  '○ Pending'}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="p-4 space-y-4">
+                              <div className="border-l-4 border-blue-500 pl-4 py-1">
+                                <div className="text-xs text-blue-400 mb-1 font-semibold uppercase tracking-wider">Question</div>
+                                <div className="text-white">{contribution.question}</div>
+                              </div>
+                              
+                              <div className="border-l-4 border-green-500 pl-4 py-1 bg-gray-800 bg-opacity-40 rounded-r-lg">
+                                <div className="text-xs text-green-400 mb-1 font-semibold uppercase tracking-wider">Contribution</div>
+                                <div className="text-white whitespace-pre-wrap">{contribution.answer}</div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-gray-700 bg-opacity-50 p-3 flex justify-end space-x-3 border-t border-gray-700">
+                              {contribution.status === 'pending' && (
+                                <>
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => updateContributionStatuse(contribution._id, 'approved')}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-lg hover:shadow-green-500/20"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    <span>Approve</span>
+                                  </motion.button>
+                                  
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => updateContributionStatuse(contribution._id, 'rejected')}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 shadow-lg hover:shadow-red-500/20"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                    <span>Reject</span>
+                                  </motion.button>
+                                </>
+                              )}
+                              
+                              {contribution.status !== 'pending' && (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => updateContributionStatuse(contribution._id, 'pending')}
+                                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 shadow-lg"
+                                >
+                                  <Clock className="w-4 h-4" />
+                                  <span>Reset to Pending</span>
+                                </motion.button>
+                              )}
+                            </div>
+                          </motion.div>
+                        ))
+                      )}
+                    </div>
+                    
+                    {contributions.length > 5 && (
+                      <div className="flex justify-center py-3 mt-2 bg-gray-800 bg-opacity-30 rounded-lg">
+                        <motion.div
+                          animate={{ 
+                            rotate: 360,
+                          }}
+                          transition={{ 
+                            duration: 1.5, 
+                            repeat: Infinity, 
+                            ease: "linear" 
+                          }}
+                        >
+                          <RefreshCw className="w-6 h-6 text-blue-400" />
+                        </motion.div>
+                        <span className="ml-2 text-gray-400">Loading more...</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-  
-  <div 
-    className="max-h-[70vh] overflow-y-auto pr-1 pb-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900"
-    style={{ 
-      scrollbarWidth: 'thin',
-      scrollbarColor: '#4B5563 #111827'
-    }}
-  >
-    <div className="space-y-4 mb-24 mt-2">
-      {contributions.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700">
-          <motion.div 
-            animate={{ 
-              opacity: [0.5, 1, 0.5],
-              scale: [0.98, 1, 0.98]
-            }}
-            transition={{ duration: 3, repeat: Infinity }}
-            className="flex justify-center mb-4"
-          >
-            <User className="w-16 h-16 text-gray-600" />
-          </motion.div>
-          <p className="text-gray-400 text-lg font-medium">No contributions found</p>
-          <p className="text-gray-500 text-sm mt-2">User submissions will appear here</p>
-        </div>
-      ) : (
-        contributions.map((contribution, index) => (
-          <motion.div 
-            key={contribution._id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`border rounded-xl overflow-hidden shadow-lg ${
-              contribution.status === 'approved' 
-                ? 'border-green-600 bg-gradient-to-r from-gray-900 to-green-900 bg-opacity-10' 
-                : contribution.status === 'rejected'
-                  ? 'border-red-600 bg-gradient-to-r from-gray-900 to-red-900 bg-opacity-10'
-                  : 'border-yellow-600 bg-gradient-to-r from-gray-900 to-yellow-900 bg-opacity-10'
-            } ${index === contributions.length - 1 ? 'mb-4' : ''}`}
-          >
-            <div className="flex justify-between items-center p-4 border-b border-gray-700">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-900 bg-opacity-30 rounded-full p-2">
-                  <User className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <span className="font-medium text-white">{contribution.name}</span>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {new Date(contribution.createdAt).toLocaleDateString()} • 
-                    {new Date(contribution.createdAt).toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <span 
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    contribution.status === 'approved' 
-                      ? 'bg-green-900 bg-opacity-30 text-green-300 border border-green-600' 
-                      : contribution.status === 'rejected'
-                        ? 'bg-red-900 bg-opacity-30 text-red-300 border border-red-600'
-                        : 'bg-yellow-900 bg-opacity-30 text-yellow-300 border border-yellow-600'
-                  }`}
-                >
-                  {contribution.status === 'approved' ? '✓ Approved' : 
-                   contribution.status === 'rejected' ? '× Rejected' : 
-                   '○ Pending'}
-                </span>
-              </div>
-            </div>
-            
-            <div className="p-4 space-y-4">
-              <div className="border-l-4 border-blue-500 pl-4 py-1">
-                <div className="text-xs text-blue-400 mb-1 font-semibold uppercase tracking-wider">Question</div>
-                <div className="text-white">{contribution.question}</div>
-              </div>
-              
-              <div className="border-l-4 border-green-500 pl-4 py-1 bg-gray-800 bg-opacity-40 rounded-r-lg">
-                <div className="text-xs text-green-400 mb-1 font-semibold uppercase tracking-wider">Contribution</div>
-                <div className="text-white whitespace-pre-wrap">{contribution.answer}</div>
-              </div>
-            </div>
-            
-            <div className="bg-grey-700 mb-16 bg-opacity-50 p-3 flex justify-end space-x-3 border-t border-gray-700">
-              {contribution.status === 'pending' && (
-                <>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => updateContributionStatuse(contribution._id, 'approved')}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-lg hover:shadow-green-500/20"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Approve</span>
-                  </motion.button>
-                  
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => updateContributionStatuse(contribution._id, 'rejected')}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 shadow-lg hover:shadow-red-500/20"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>Reject</span>
-                  </motion.button>
-                </>
-              )}
-              
-              {contribution.status !== 'pending' && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => updateContributionStatuse(contribution._id, 'pending')}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 shadow-lg"
-                >
-                  <Clock className="w-4 h-4" />
-                  <span>Reset to Pending</span>
-                </motion.button>
-              )}
-            </div>
-          </motion.div>
-        ))
-      )}
-    </div>
-  </div>
-  
-  {contributions.length > 5 && (
-    <div className="flex justify-center py-3 mt-2 bg-gray-800 bg-opacity-30 rounded-lg">
-      <motion.div
-        animate={{ 
-          rotate: 360,
-        }}
-        transition={{ 
-          duration: 1.5, 
-          repeat: Infinity, 
-          ease: "linear" 
-        }}
-      >
-        <RefreshCw className="w-6 h-6 text-blue-400" />
-      </motion.div>
-      <span className="ml-2 text-gray-400">Loading more...</span>
-    </div>
-  )}
-</div>
                 )}
               </div>
             </div>

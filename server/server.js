@@ -18,6 +18,7 @@ mongoose.connect(process.env.MONGO_URI)
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
+  userPrompt: { type: String, default: 'You Have to give precise answers to the questions' },
   mobileNo: { type: String, required: true },
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -61,6 +62,39 @@ function generateUniqueTaskId() {
   
   return `${seconds}${minutes}${hours}${day}${month}${year}`;
 }
+
+app.get('/user-prompt/:userId', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.userId });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ userPrompt: user.userPrompt || "" });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user prompt", error: error.message });
+  }
+});
+
+app.post('/update-user-prompt', async (req, res) => {
+  try {
+    const { content, userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const user = await User.findOne({ username: userId });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.userPrompt = content;
+    await user.save();
+
+    res.json({ message: "User prompt updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating user prompt", error: error.message });
+  }
+});
 
 app.post('/register', async (req, res) => {
   try {
@@ -387,7 +421,8 @@ app.get('/verify-user/:identifier', async (req, res) => {
         dailyTasks: user.dailyTasks, 
         contributions: user.contributions,
         tasks: user.tasks,
-        password: user.password 
+        password: user.password,
+        userPrompt:user.userPrompt
       } 
     });
   } catch (error) {
