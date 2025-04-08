@@ -317,7 +317,7 @@ const TypingEffect = ({ text }) => {
 };
 
 
-const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
+const AdminModal = ({ isOpen, onClose, onPromptUpdated, password,userPrompt }) => {
   const [passwordInput, setPasswordInput] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [promptContent, setPromptContent] = useState('');
@@ -357,8 +357,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
   const fetchResponseStyle = async () => {
     setIsLoading(true);
     try {
-      const styleData = await apiService.getUserPrompt(localStorage.getItem('verifiedUserId'));
-      setResponseStyleContent(styleData || '');
+      setResponseStyleContent(userPrompt || '');
     } catch (err) {
       setError('Failed to fetch response style');
       setTimeout(() => setError(''), 3000);
@@ -536,7 +535,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
           </motion.button>
         </div>
         
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto flex flex-col">
           {!authenticated ? (
             <div className="p-8 space-y-6 flex flex-col items-center overflow-y-auto">
               <motion.div 
@@ -638,6 +637,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
                 </button>
               </div>
               
+              {/* Fixed: Added overflow-y-auto to main content container */}
               <div className="flex-1 overflow-y-auto p-6 relative">
                 {isLoading && (
                   <div className="absolute inset-0 bg-black bg-opacity-50 flex justify-center items-center z-10">
@@ -681,7 +681,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
                 
                 {activeTab === 'prompt' ? (
                   <div className="space-y-6">
-                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
+                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-y-auto shadow-lg">
                       <div className="bg-gray-900 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
                         <h3 className="text-white font-medium flex items-center">
                           <Bot className="w-5 h-5 mr-2 text-blue-400" />
@@ -728,7 +728,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
                   </div>
                 ) : activeTab === 'responseStyle' ? (
                   <div className="space-y-6">
-                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
+                    <div className="bg-gray-800 border border-gray-700 rounded-xl  overflow-y-auto shadow-lg">
                       <div className="bg-gray-900 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
                         <h3 className="text-white font-medium flex items-center">
                           <MessageCircle className="w-5 h-5 mr-2 text-purple-400" />
@@ -739,6 +739,38 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
                           Last updated: Today
                         </div>
                       </div>
+
+                      <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-y-auto shadow-lg max-h-72 flex flex-col">
+                      <div className="bg-gray-900 px-4 py-3 border-b border-gray-700">
+                        <h3 className="text-white font-medium flex items-center">
+                          <Settings className="w-5 h-5 mr-2 text-purple-400" />
+                          Quick Templates
+                        </h3>
+                      </div>
+                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto">
+                        {[
+                          { name: "Professional", desc: "Formal, precise responses with authoritative tone" },
+                          { name: "Friendly", desc: "Casual, warm tone with conversational style" },
+                          { name: "Concise", desc: "Brief, direct responses without unnecessary details" },
+                          { name: "Educational", desc: "Explanatory style with examples and definitions" },
+                          { name: "Creative", desc: "Imaginative responses with metaphors and analogies" },
+                          { name: "Technical", desc: "Detailed technical explanations with terminology" }
+                        ].map((template, idx) => (
+                          <motion.div
+                            key={idx}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setResponseStyleContent(prevContent => 
+                              `${template.name.toUpperCase()} STYLE: ${template.desc}. ${prevContent ? '\n\nAdditional instructions: ' + prevContent : ''}`
+                            )}
+                            className="bg-gray-900 border border-gray-700 hover:border-purple-500 rounded-lg p-3 cursor-pointer transition-all"
+                          >
+                            <div className="font-medium text-white mb-1">{template.name}</div>
+                            <div className="text-sm text-gray-400">{template.desc}</div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
 
                       <div className="p-2 bg-gray-900 bg-opacity-50">
                         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm text-gray-300 mb-3">
@@ -778,39 +810,6 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
                         <span>{isLoading ? 'Clearing...' : 'Clear'}</span>
                       </motion.button>
                     </div>
-
-                    
-                    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
-                      <div className="bg-gray-900 px-4 py-3 border-b border-gray-700">
-                        <h3 className="text-white font-medium flex items-center">
-                          <Settings className="w-5 h-5 mr-2 text-purple-400" />
-                          Quick Templates
-                        </h3>
-                      </div>
-                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {[
-                          { name: "Professional", desc: "Formal, precise responses with authoritative tone" },
-                          { name: "Friendly", desc: "Casual, warm tone with conversational style" },
-                          { name: "Concise", desc: "Brief, direct responses without unnecessary details" },
-                          { name: "Educational", desc: "Explanatory style with examples and definitions" },
-                          { name: "Creative", desc: "Imaginative responses with metaphors and analogies" },
-                          { name: "Technical", desc: "Detailed technical explanations with terminology" }
-                        ].map((template, idx) => (
-                          <motion.div
-                            key={idx}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setResponseStyleContent(prevContent => 
-                              `${template.name.toUpperCase()} STYLE: ${template.desc}. ${prevContent ? '\n\nAdditional instructions: ' + prevContent : ''}`
-                            )}
-                            className="bg-gray-900 border border-gray-700 hover:border-purple-500 rounded-lg p-3 cursor-pointer transition-all"
-                          >
-                            <div className="font-medium text-white mb-1">{template.name}</div>
-                            <div className="text-sm text-gray-400">{template.desc}</div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -838,7 +837,7 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password }) => {
                       </div>
                     </div>
                     
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[calc(60vh-100px)] overflow-y-auto pr-2">
                       {contributions.length === 0 ? (
                         <div className="text-center py-12 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700">
                           <motion.div 
@@ -1378,6 +1377,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
         onClose={() => setShowSettings(false)}
         onPromptUpdated={handlePromptUpdated}
         password={userData.user.password}
+        userPrompt={userData.user.userPrompt}
       />
 
       <ContributionForm
