@@ -179,6 +179,26 @@ const AdminPanel = ({ userData, onClose }) => {
     }
   });
 
+  const renderDescription = (text) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a 
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:underline"
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   const getStatusColor = (status) => {
     switch(status) {
       case 'completed':
@@ -387,8 +407,9 @@ const AdminPanel = ({ userData, onClose }) => {
                         </div>
                         
                         {task.taskDescription && (
-                          <p className="text-gray-400 text-sm mb-2">{task.taskDescription}</p>
-                        )}
+                          <p className="text-gray-400 text-sm mb-2">
+  {renderDescription(task.taskDescription)}
+</p>                        )}
                         
                         <p className="text-gray-300 text-base mb-4">{task.taskQuestion}</p>
                         

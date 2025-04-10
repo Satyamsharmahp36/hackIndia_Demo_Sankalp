@@ -14,7 +14,8 @@ async function detectTaskRequest(question, userData) {
     Analyze the following text and determine if it contains a request for a future task, follow-up, or reminder.
     First, respond with "YES" if it's a task request or "NO" if it's not.
     
-    If it is a task request, on a new line after "YES", provide a brief description of the task (maximum 10 words).
+    If it is a task request, on a new line after "YES", provide a description of the task like with's this all about(maximum 1/3 the orignal task asked) 
+    Also if task have come link's then attach that also in the description.
     
     Examples of task requests:
     - "When you get time ping me about the cosmos deployment"
