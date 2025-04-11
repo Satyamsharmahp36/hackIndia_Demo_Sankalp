@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowRight, 
@@ -10,34 +11,115 @@ import {
   ChevronRight, 
   LogOut,
   Home,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
 import ChatBot from './ChatBot';
 import AdminPanel from './AdminPanel';
 
-const HomePage = ({ userName, userData, onLogout }) => {
-  const [name, setName] = useState(userName || '');
+const HomePage = ({ userData, onLogout }) => {
+  const { username } = useParams(); 
+  const navigate = useNavigate();
+  
+  const [profileOwnerData, setProfileOwnerData] = useState(null);
+  const [profileOwnerName, setProfileOwnerName] = useState('');
+  const [isProfileOwnerLoaded, setIsProfileOwnerLoaded] = useState(false);
+  
+  const [presentUserName, setPresentUserName] = useState('');
+  const [presentUserData, setPresentUserData] = useState(null);
+  const [isPresentUserAuthenticated, setIsPresentUserAuthenticated] = useState(false);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isNameEntered, setIsNameEntered] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showChatBot, setShowChatBot] = useState(false);
-  const [currentUserData, setCurrentUserData] = useState(userData);
-  const [presentData, setPresentData] = useState(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showUserNotFoundModal, setShowUserNotFoundModal] = useState(false);
 
-  useEffect(() => {
-    const savedName = sessionStorage.getItem('userName');
-    if (savedName) {
-      setName(savedName);
-    }
+  const backgroundBubbles = useMemo(() => {
+    return [...Array(20)].map((_, i) => ({
+      id: i,
+      width: Math.random() * 300 + 50,
+      height: Math.random() * 300 + 50,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      yMovement: Math.random() * 30 - 15,
+      xMovement: Math.random() * 30 - 15,
+      duration: Math.random() * 10 + 10,
+    }));
   }, []);
 
-  const handleSubmit = async (e) => {
+   const fetchProfileOwner = async (username) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND}/verify-user/${username}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      const data = await response.json();
+      if (response.ok) {
+        setProfileOwnerData(data);
+        setProfileOwnerName(data.user?.name || username);
+        setIsProfileOwnerLoaded(true);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error fetching profile owner data:', error);
+      return false;
+    }
+  };
+
+   const fetchPresentUser = async (username) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND}/verify-user/${username}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      const data = await response.json();
+      if (response.ok) {
+        setPresentUserData(data);
+        sessionStorage.setItem('presentUserData', JSON.stringify(data));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error fetching present user data:', error);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    if (username) {
+      fetchProfileOwner(username);
+    } else if (userData) {
+      setProfileOwnerData(userData);
+      setProfileOwnerName(userData.user?.name || '');
+      setIsProfileOwnerLoaded(true);
+    }
+    
+    const storedPresentUser = sessionStorage.getItem('presentUserName');
+    if (storedPresentUser) {
+      setPresentUserName(storedPresentUser);
+      const storedPresentUserData = sessionStorage.getItem('presentUserData');
+      if (storedPresentUserData) {
+        setPresentUserData(JSON.parse(storedPresentUserData));
+        setIsPresentUserAuthenticated(true);
+      }
+    }
+  }, [username, userData]);
+
+  const handlePresentUserSubmit = async (e) => {
     e.preventDefault();
     
-    if (!name.trim()) {
-      setErrorMessage('Please enter a ChatMate username');
+    if (!presentUserName.trim()) {
+      setErrorMessage('Please enter your ChatMate username');
       setTimeout(() => setErrorMessage(''), 3000);
       return;
     }
@@ -45,16 +127,16 @@ const HomePage = ({ userName, userData, onLogout }) => {
     setIsSubmitting(true);
     
     try {
-      const userExists = await fetchUser();
+      const userExists = await fetchPresentUser(presentUserName.trim());
       
       if (userExists) {
-        sessionStorage.setItem('userName', name.trim());
-        setIsNameEntered(true);
+        sessionStorage.setItem('presentUserName', presentUserName.trim());
+        setIsPresentUserAuthenticated(true);
       } else {
         setShowUserNotFoundModal(true);
       }
     } catch (error) {
-      console.error('Error validating username:', error);
+      console.error('Error validating present username:', error);
       setErrorMessage('Error validating username. Please try again.');
       setTimeout(() => setErrorMessage(''), 3000);
     } finally {
@@ -66,38 +148,16 @@ const HomePage = ({ userName, userData, onLogout }) => {
     setShowChatBot(true);
   };
 
-  const fetchUser = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND}/verify-user/${name}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-
-      const data = await response.json();
-      if (response.ok) {
-        setPresentData(data);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      return false;
-    }
-  };
-
   const refetchUserData = async () => {
     try {
-      const savedUserId = localStorage.getItem('verifiedUserId');
+      const savedUsername = sessionStorage.getItem('presentUserName');
       
-      if (!savedUserId) {
-        throw new Error('No user ID found');
+      if (!savedUsername) {
+        throw new Error('No username found');
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_BACKEND}/verify-user/${savedUserId}`,
+        `${import.meta.env.VITE_BACKEND}/verify-user/${savedUsername}`,
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
@@ -107,8 +167,8 @@ const HomePage = ({ userName, userData, onLogout }) => {
       const data = await response.json();
 
       if (response.ok) {
-        sessionStorage.setItem('userData', JSON.stringify(data));
-        setCurrentUserData(data);
+        sessionStorage.setItem('presentUserData', JSON.stringify(data));
+        setPresentUserData(data);
         return data;
       } else {
         throw new Error(data.message || 'Failed to refetch user data');
@@ -120,16 +180,32 @@ const HomePage = ({ userName, userData, onLogout }) => {
   };
 
   const continueWithoutAccount = () => {
-    sessionStorage.setItem('userName', name.trim());
+    sessionStorage.setItem('presentUserName', presentUserName.trim());
     setShowUserNotFoundModal(false);
-    setIsNameEntered(true);
+    setIsPresentUserAuthenticated(true);
   };
 
   const tryDifferentUsername = () => {
     setShowUserNotFoundModal(false);
   };
 
-  const HomeButton = () => (
+  const handleLogout = () => {
+    sessionStorage.removeItem('presentUserName');
+    sessionStorage.removeItem('presentUserData');
+    if (onLogout) {
+      onLogout();
+    }
+    setIsPresentUserAuthenticated(false);
+    setShowChatBot(false);
+    setPresentUserData(null);
+    setPresentUserName('');
+  };
+
+  const navigateToHome = () => {
+    navigate('/');
+  };
+
+  const renderHomeButton = () => (
     <button
       type="button"
       onClick={() => setShowAdminPanel(true)}
@@ -139,7 +215,7 @@ const HomePage = ({ userName, userData, onLogout }) => {
     </button>
   );
 
-  const UserNotFoundModal = () => (
+  const renderUserNotFoundModal = () => (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -155,7 +231,7 @@ const HomePage = ({ userName, userData, onLogout }) => {
         </div>
         <h3 className="text-xl font-bold text-center mb-3">Username Not Found</h3>
         <p className="text-gray-300 text-center mb-6">
-          The username "{name}" is not registered on ChatMate. Please register at{" "}
+          The username "{presentUserName}" is not registered on ChatMate. Please register at{" "}
           <a 
             href="https://chat-matee.vercel.app/" 
             target="_blank" 
@@ -184,37 +260,46 @@ const HomePage = ({ userName, userData, onLogout }) => {
     </motion.div>
   );
 
-  if (showChatBot) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-r from-slate-500 to-slate-800 relative">
-        <ChatBot 
-          userName={name} 
-          userData={currentUserData} 
-          onRefetchUserData={refetchUserData}
-          presentUserData={presentData}
-        />
-        <div className="absolute top-4 right-4 flex gap-3">
-          <HomeButton />
-          <button
-            type="button"
-            onClick={() => onLogout && onLogout()}
-            className="text-white bg-red-500 hover:bg-red-600 p-2 rounded-full flex items-center justify-center cursor-pointer"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-        
-        {showAdminPanel && (
-          <AdminPanel 
-            userData={currentUserData} 
-            onClose={() => setShowAdminPanel(false)} 
-          />
-        )}
+  const chatBotView = (
+    <div className="h-screen flex items-center justify-center bg-gradient-to-r from-slate-500 to-slate-800 relative">
+       <div className="absolute top-4 left-4 z-50">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={navigateToHome}
+          className="text-white bg-blue-600 hover:bg-blue-700 p-2 rounded-full flex items-center justify-center cursor-pointer shadow-lg"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </motion.button>
       </div>
-    );
-  }
+      
+      <ChatBot
+        userName={presentUserName} 
+        userData={profileOwnerData}
+        onRefetchUserData={refetchUserData}  
+        presentUserData={presentUserData}
+      />
+      <div className="absolute top-4 right-4 flex gap-3">
+        {renderHomeButton()}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="text-white bg-red-500 hover:bg-red-600 p-2 rounded-full flex items-center justify-center cursor-pointer"
+        >
+          <LogOut className="w-5 h-5" />
+        </button>
+      </div>
+      
+      {showAdminPanel && (
+        <AdminPanel 
+          userData={profileOwnerData} 
+          onClose={() => setShowAdminPanel(false)} 
+        />
+      )}
+    </div>
+  );
   
-  return (
+  const homeView = (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -223,22 +308,22 @@ const HomePage = ({ userName, userData, onLogout }) => {
     >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-0 w-full h-full">
-          {[...Array(20)].map((_, i) => (
+          {backgroundBubbles.map((bubble) => (
             <motion.div
-              key={i}
+              key={bubble.id}
               className="absolute rounded-full bg-blue-500 opacity-10"
               style={{
-                width: Math.random() * 300 + 50,
-                height: Math.random() * 300 + 50,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
+                width: bubble.width,
+                height: bubble.height,
+                left: bubble.left,
+                top: bubble.top,
               }}
               animate={{
-                y: [0, Math.random() * 30 - 15],
-                x: [0, Math.random() * 30 - 15],
+                y: [0, bubble.yMovement],
+                x: [0, bubble.xMovement],
               }}
               transition={{
-                duration: Math.random() * 10 + 10,
+                duration: bubble.duration,
                 repeat: Infinity,
                 repeatType: "reverse",
               }}
@@ -247,8 +332,19 @@ const HomePage = ({ userName, userData, onLogout }) => {
         </div>
       </div>
       
+       <div className="absolute top-4 left-4 z-50">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={navigateToHome}
+          className="text-white bg-blue-600 hover:bg-blue-700 p-2 rounded-full flex items-center justify-center cursor-pointer shadow-lg"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </motion.button>
+      </div>
+      
       <div className="absolute top-4 right-4 z-50">
-        <HomeButton />
+        {renderHomeButton()}
       </div>
 
       <div className="container mx-auto flex flex-col items-center justify-center min-h-screen px-4 py-12 relative z-10">
@@ -278,11 +374,7 @@ const HomePage = ({ userName, userData, onLogout }) => {
             transition={{ delay: 0.3 }}
             className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600 mb-4"
           >
-            {currentUserData && isNameEntered 
-              ? `${currentUserData.user.name}'s AI Assistant`
-              : currentUserData && currentUserData.user 
-                ? `${currentUserData.user.name}'s AI Assistant` 
-                : "AI Assistant"}
+            {profileOwnerName ? `${profileOwnerName}'s AI Assistant` : "AI Assistant"}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -290,11 +382,9 @@ const HomePage = ({ userName, userData, onLogout }) => {
             transition={{ delay: 0.5 }}
             className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto"
           >
-            {currentUserData && isNameEntered
-              ? `Get answers to all your questions about ${currentUserData.user.name}'s projects, experience, and skills`
-              : userData && userData.user
-                ? `Get answers to all your questions about ${currentUserData.user.name}'s projects, experience, and skills`
-                : "Get answers to all your questions about projects, experience, and skills"}
+            {profileOwnerName 
+              ? `Get answers to all your questions about ${profileOwnerName}'s projects, experience, and skills`
+              : "Get answers to all your questions about projects, experience, and skills"}
           </motion.p>
         </motion.div>
 
@@ -329,18 +419,18 @@ const HomePage = ({ userName, userData, onLogout }) => {
           transition={{ delay: 0.9 }}
           className="w-full max-w-md bg-gray-800 bg-opacity-60 backdrop-blur-sm rounded-2xl p-8 border border-gray-700 shadow-xl"
         >
-          {!isNameEntered ? (
+          {!isPresentUserAuthenticated ? (
             <>
               <h2 className="text-2xl font-bold mb-6 text-center">Enter your ChatMate username</h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handlePresentUserSubmit} className="space-y-4">
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={presentUserName}
+                    onChange={(e) => setPresentUserName(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-600 rounded-lg py-3 px-10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    placeholder="ChatMate username"
+                    placeholder="Your ChatMate username"
                     disabled={isSubmitting}
                   />
                 </div>
@@ -391,13 +481,10 @@ const HomePage = ({ userName, userData, onLogout }) => {
                 <Bot className="w-8 h-8 text-white" />
               </motion.div>
               <h2 className="text-xl font-bold">
-                Hello, <span className="text-blue-400">
-                  {presentData ? presentData.user.name : name}
-                </span>!
+                Hello, <span className="text-blue-400">{presentUserData?.user?.name || presentUserName}</span>!
               </h2>
               <p className="text-gray-300">
-                Ready to start chatting with 
-                {presentData ? ` ${presentData.user.name}'s` : ""} AI Assistant?
+                Ready to start chatting with{profileOwnerName ? ` ${profileOwnerName}'s` : ""} AI Assistant?
               </p>
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -414,23 +501,25 @@ const HomePage = ({ userName, userData, onLogout }) => {
         
         {showAdminPanel && (
           <AdminPanel 
-            userData={currentUserData} 
+            userData={presentUserData} 
             onClose={() => setShowAdminPanel(false)} 
           />
         )}
 
-        {showUserNotFoundModal && <UserNotFoundModal />}
+        {showUserNotFoundModal && renderUserNotFoundModal()}
       </div>
     </motion.div>
   );
+
+  return showChatBot ? chatBotView : homeView;
 };
 
 HomePage.propTypes = {
-  userName: PropTypes.string,
   userData: PropTypes.shape({
     user: PropTypes.shape({
       _id: PropTypes.string,
-      name: PropTypes.string
+      name: PropTypes.string,
+      username: PropTypes.string
     })
   }),
   onLogout: PropTypes.func

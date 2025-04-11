@@ -1,20 +1,29 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
-import { Info, UserCheck, Sparkles, ExternalLink } from 'lucide-react';
+import { UserCheck, Sparkles, Info, ChevronRight } from 'lucide-react';
 
 const UserVerificationPage = ({ onUserVerified }) => {
-  const [userId, setUserId] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [username, setUsername] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const navigate = useNavigate();
 
-  const handleVerifyUser = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
+    
+    if (!username.trim()) {
+      setErrorMessage('Please enter a ChatMate username');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_BACKEND}/verify-user/${userId}`,
+        `${import.meta.env.VITE_BACKEND}/verify-user/${username.trim()}`,
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
@@ -22,19 +31,25 @@ const UserVerificationPage = ({ onUserVerified }) => {
       );
 
       const data = await response.json();
-
+      
       if (response.ok) {
-        localStorage.setItem('verifiedUserId', userId);
+         sessionStorage.setItem('userName', username.trim());
         sessionStorage.setItem('userData', JSON.stringify(data));
-        onUserVerified(data);
+        sessionStorage.setItem('hasStartedChat', 'true');
+        
+         onUserVerified(data);
+        
+         navigate(`home/${username.trim()}`);
       } else {
-        const errorMessage = data.message || 'User verification failed';
-        setError(errorMessage);
+        setErrorMessage('User not found. Please try a different username.');
+        setTimeout(() => setErrorMessage(''), 3000);
       }
-    } catch (err) {
-      setError('Network error. Please try again.');
+    } catch (error) {
+      console.error('Error validating username:', error);
+      setErrorMessage('Error connecting to server. Please try again.');
+      setTimeout(() => setErrorMessage(''), 3000);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -115,7 +130,7 @@ const UserVerificationPage = ({ onUserVerified }) => {
             </motion.p>
           </div>
 
-          <form onSubmit={handleVerifyUser} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -125,66 +140,78 @@ const UserVerificationPage = ({ onUserVerified }) => {
                 <UserCheck className="text-pink-400 mr-3" />
                 <input
                   type="text"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  placeholder="Enter UserID"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter ChatMate username"
                   className="w-full bg-transparent text-purple-100 placeholder-purple-300 focus:outline-none"
+                  disabled={isSubmitting}
                   required
                 />
               </div>
               <div className="flex items-center text-xs text-purple-300 mb-4">
                 <Info className="w-4 h-4 mr-2 text-pink-400" />
-                <span>UserID is the unique username of the AI assistant you want to use</span>
+                <span>Enter your ChatMate username to access your personal assistant</span>
               </div>
             </motion.div>
 
-            {error && (
-              <motion.p 
+            {errorMessage && (
+              <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-pink-400 text-sm text-center"
+                className="text-pink-400 text-sm flex items-center justify-center"
               >
-                {error}
-              </motion.p>
+                <span className="mr-2">⚠️</span> {errorMessage}
+              </motion.div>
             )}
 
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-700 to-pink-700 text-white p-3 rounded-lg hover:from-purple-800 hover:to-pink-800 transition-all flex items-center justify-center"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-purple-700 to-pink-700 text-white p-3 rounded-lg hover:from-purple-800 hover:to-pink-800 transition-all flex items-center justify-center space-x-2"
             >
-              {isLoading ? (
-                <div className="animate-spin h-5 w-5 border-t-2 border-white rounded-full"></div>
+              {isSubmitting ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                />
               ) : (
-                'Enter UserID'
+                <>
+                  <span>Continue</span>
+                  <ChevronRight className="w-5 h-5" />
+                </>
               )}
             </motion.button>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-              className="text-center mt-4"
-            >
-              <motion.a
-                href="https://chat-matee.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="text-purple-300 hover:text-pink-400 transition-colors flex items-center justify-center"
-              >
-                <span>Wanted to create your own chatbot?</span>
-                <ExternalLink className="ml-2 w-4 h-4 text-pink-400" />
-              </motion.a>
-            </motion.div>
           </form>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+            className="text-center mt-6"
+          >
+            <p className="text-purple-300">
+              Don't have an account?{" "}
+              <a 
+                href="https://chat-matee.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-pink-400 hover:underline transition-colors"
+              >
+                Register here
+              </a>
+            </p>
+          </motion.div>
         </div>
       </motion.div>
     </div>
   );
+};
+
+UserVerificationPage.propTypes = {
+  onUserVerified: PropTypes.func.isRequired
 };
 
 export default UserVerificationPage;

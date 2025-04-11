@@ -31,60 +31,35 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
   const [showContributionForm, setShowContributionForm] = useState(false);
   const [promptUpdated, setPromptUpdated] = useState(false);
   const [lastQuestion, setLastQuestion] = useState('');
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
   const [currentUserData, setCurrentUserData] = useState(userData);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const modalRef = useRef(null);
 
-  // Keep local state in sync with props
   useEffect(() => {
     setCurrentUserData(userData);
   }, [userData]);
 
-  const clearChatHistory = () => {
-    setShowDeleteConfirmation(true);
-  };
-
-  const handleConfirmDeleteHistory = () => {
-    const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
-    delete allChatHistories[chatHistoryKey];
-    localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
-
-    const initialMessage = {
-      type: 'bot',
-      content: `Hi${userName ? ' ' + userName : ''}! I'm ${userData.user.name} AI assistant. Feel free to ask me about my projects, experience, or skills!`,
-      timestamp: new Date().toISOString()
-    };
-
-    setMessages([initialMessage]);
-    setShowDeleteConfirmation(false);
-    setShowDeleteSuccessModal(true);
-
-    setTimeout(() => {
-      setShowDeleteSuccessModal(false);
-    }, 3000);
-  };
-
   useEffect(() => {
-    if (!userName) {
-      const storedName = sessionStorage.getItem('userName');
-      if (storedName) {
-        const updatedChatHistoryKey = `${storedName}_${userData.user.name}`;
-        const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
-        
-        if (allChatHistories[updatedChatHistoryKey]) {
-          setMessages(allChatHistories[updatedChatHistoryKey]);
-        } else if (messages.length === 1 && messages[0].type === 'bot') {
-          setMessages([
-            {
-              type: 'bot',
-              content: `Hi ${storedName}! I'm ${userData.user.name}'s AI assistant. Feel free to ask me about my projects, experience, or skills!`,
-              timestamp: new Date().toISOString()
-            }
-          ]);
-        }
+    const storedName = sessionStorage.getItem('userName');
+    if (!userName && storedName) {
+      const updatedChatHistoryKey = `${storedName}_${userData.user.name}`;
+      const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+      
+      if (allChatHistories[updatedChatHistoryKey]) {
+        setMessages(allChatHistories[updatedChatHistoryKey]);
+      } else if (messages.length === 1 && messages[0].type === 'bot') {
+        setMessages([
+          {
+            type: 'bot',
+            content: `Hi ${storedName}! I'm ${userData.user.name}'s AI assistant. Feel free to ask me about my projects, experience, or skills!`,
+            timestamp: new Date().toISOString()
+          }
+        ]);
       }
     }
   }, [userName, userData.user.name]);
@@ -118,8 +93,79 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+   useEffect(() => {
+    function handleClickOutside(event) {
+      if (showDeleteModal && modalRef.current && !modalRef.current.contains(event.target)) {
+        setShowDeleteModal(false);
+      }
+    }
+
+     if (showDeleteModal) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDeleteModal]);
+
+   useEffect(() => {
+    function handleEscapeKey(event) {
+      if (event.key === 'Escape' && showDeleteModal) {
+        setShowDeleteModal(false);
+      }
+    }
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [showDeleteModal]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+   const handleOpenDeleteModal = () => {
+    if (!isDeleting) {
+      setShowDeleteModal(true);
+    }
+  };
+
+   const handleCloseDeleteModal = () => {
+    setShowDeleteModal(false);
+  };
+
+   const handleDeleteHistory = () => {
+     setIsDeleting(true);
+    
+    try {
+       setShowDeleteModal(false);
+      
+       setTimeout(() => {
+        const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
+        delete allChatHistories[chatHistoryKey];
+        localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
+  
+        const initialMessage = {
+          type: 'bot',
+          content: `Hi${userName ? ' ' + userName : ''}! I'm ${userData.user.name} AI assistant. Feel free to ask me about my projects, experience, or skills!`,
+          timestamp: new Date().toISOString()
+        };
+  
+         setMessages([initialMessage]);
+        
+         setShowDeleteSuccessModal(true);
+        
+        setTimeout(() => {
+          setShowDeleteSuccessModal(false);
+          setIsDeleting(false);
+        }, 3000);
+      }, 300);
+    } catch (error) {
+      console.error('Error deleting chat history:', error);
+      setIsDeleting(false);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -162,42 +208,6 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
       setIsLoading(false);
     }
   };
-
-  const DeleteConfirmationModal = () => (
-    <AnimatePresence>
-      {showDeleteConfirmation && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-        >
-          <motion.div
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            className="bg-gray-800 p-6 rounded-lg text-white max-w-md w-full"
-          >
-            <h2 className="text-xl font-bold mb-4">Delete Chat History</h2>
-            <p className="mb-6">Are you sure you want to delete your entire chat history? This action cannot be undone.</p>
-            <div className="flex justify-end space-x-4">
-              <button 
-                onClick={() => setShowDeleteConfirmation(false)}
-                className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleConfirmDeleteHistory}
-                className="px-4 py-2 bg-red-600 rounded hover:bg-red-500 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -249,7 +259,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
   };
 
   return (
-    <div className="flex flex-col h-screen md:h-11/12 lg:max-w-1/2 lg:rounded-xl text-xl bg-gray-900 text-white shadow-2xl overflow-hidden">
+    <div className="flex flex-col h-screen md:h-11/12 lg:max-w-1/2 lg:rounded-xl md:pt-0 pt-16 text-xl bg-gray-900 text-white shadow-2xl overflow-hidden">
       <div className="bg-gray-800 py-4 rounded-t-xl px-6 flex justify-between items-center border-b border-gray-700">
         <div className="flex items-center">
           <Bot className="w-6 h-6 text-blue-400 mr-2" />
@@ -402,18 +412,66 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
               )}
             </motion.button>
             
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={clearChatHistory}
-              className="p-2 ml-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+            <button
+              onClick={handleOpenDeleteModal}
+              disabled={isDeleting}
+              aria-label="Delete chat history"
+              className={`p-2 ml-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              data-testid="delete-chat-button"
             >
               <Trash2 className="w-5 h-5" />
-            </motion.button>
+            </button>
           </div>
         </div>
       </div>
 
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm px-4">
+          <div 
+            ref={modalRef}
+            className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 border border-gray-700"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="delete-modal-content"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center">
+                <AlertTriangle className="w-5 h-5 text-red-500 mr-2" />
+                Delete Chat History
+              </h2>
+              <button 
+                onClick={handleCloseDeleteModal}
+                className="p-1 rounded-full hover:bg-gray-700 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to delete your entire chat history? This action cannot be undone.
+            </p>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleCloseDeleteModal}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                data-testid="delete-modal-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteHistory}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors flex items-center"
+                data-testid="delete-modal-confirm"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <AnimatePresence>
         {showDeleteSuccessModal && (
           <motion.div 
@@ -430,7 +488,6 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
         )}
       </AnimatePresence>
 
-      {/* Key addition: pass current state to AdminModal */}
       <AdminModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -445,9 +502,6 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
         lastQuestion={lastQuestion}
         onContriUpdated={handleContriUpdated}
       />
-
-      <DeleteConfirmationModal />
-
     </div>
   );
 };
