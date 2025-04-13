@@ -11,6 +11,7 @@ import {
   Sparkles,
   AlertTriangle,
   Clock,
+  Copy
 } from 'lucide-react';
 
 const scrollbarStyles = `
@@ -61,6 +62,8 @@ const SignupPage = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [copied, setCopied] = useState(false);
+
 
   const inputVariants = {
     initial: { 
@@ -194,8 +197,6 @@ const SignupPage = () => {
           usePublicKey: uiState.usePublicKey
         });
 
-        localStorage.setItem('userId', response.data.userId);
-        localStorage.setItem('username', formData.username);
         setUiState(prev => ({...prev, showSuccessModal: true, loading: false}));
       } catch (error) {
         setUiState(prev => ({
@@ -603,19 +604,26 @@ const SignupPage = () => {
                 <div className="bg-blue-900/30 p-2 rounded-lg border border-blue-500/30">
                   <p className="text-gray-400 text-xs mb-1">Your personal URL:</p>
                   <div className="flex items-center bg-gray-800/70 rounded-lg p-2 overflow-hidden">
-                    <p className="text-green-300 font-mono text-xs truncate">
-                      https://chatoomate.vercel.app/home/{formData.username}
-                    </p>
-                    <button 
-                      onClick={() => {
-                        navigator.clipboard.writeText(`https://chatoomate.vercel.app/home/${formData.username}`);
-                        alert('URL copied to clipboard!');
-                      }}
-                      className="ml-2 text-gray-400 hover:text-white flex-shrink-0"
-                    >
-                      <Check size={16} />
-                    </button>
-                  </div>
+                      <p className="text-green-300 font-mono text-xs truncate">
+                        https://chatoomate.vercel.app/home/{formData.username}
+                      </p>
+                      <motion.button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`https://chatoomate.vercel.app/home/${formData.username}`);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+                        }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        className="ml-2 text-gray-400 hover:text-white flex-shrink-0 transition-colors duration-300"
+                      >
+                        {copied ? (
+                          <CheckCircle size={16} className="text-green-500" />
+                        ) : (
+                          <Copy size={16} />
+                        )}
+                      </motion.button>
+                    </div>
                 </div>
               </div>
               
