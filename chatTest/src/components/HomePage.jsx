@@ -36,8 +36,7 @@ const HomePage = ({ userData, onLogout }) => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showUserNotFoundModal, setShowUserNotFoundModal] = useState(false);
   
-  // New state variables for password authentication
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [tempUserData, setTempUserData] = useState(null);
@@ -91,8 +90,7 @@ const HomePage = ({ userData, onLogout }) => {
 
       const data = await response.json();
       if (response.ok) {
-        // Store temporary user data but don't authenticate yet until password is verified
-        setTempUserData(data);
+         setTempUserData(data);
         return true;
       }
       return false;
@@ -102,8 +100,7 @@ const HomePage = ({ userData, onLogout }) => {
     }
   };
 
-  // New function to verify user password
-  const verifyPassword = async (username, password) => {
+   const verifyPassword = async (username, password) => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND}/verify-password`,
@@ -123,8 +120,7 @@ const HomePage = ({ userData, onLogout }) => {
   };
 
   useEffect(() => {
-    // Check if user is already logged in
-    const storedAuthStatus = localStorage.getItem('isPresentUserAuthenticated');
+     const storedAuthStatus = localStorage.getItem('isPresentUserAuthenticated');
     const storedPresentUserName = localStorage.getItem('presentUserName');
     const storedPresentUserData = localStorage.getItem('presentUserData');
     
@@ -133,8 +129,7 @@ const HomePage = ({ userData, onLogout }) => {
       setPresentUserData(JSON.parse(storedPresentUserData));
       setIsPresentUserAuthenticated(true);
     } else {
-      // Check session storage if local storage is not available
-      const sessionPresentUser = sessionStorage.getItem('presentUserName');
+       const sessionPresentUser = sessionStorage.getItem('presentUserName');
       if (sessionPresentUser) {
         setPresentUserName(sessionPresentUser);
         const sessionPresentUserData = sessionStorage.getItem('presentUserData');
@@ -169,8 +164,7 @@ const HomePage = ({ userData, onLogout }) => {
       const userExists = await fetchPresentUser(presentUserName.trim());
       
       if (userExists) {
-        // Instead of immediate authentication, show password modal
-        setShowPasswordModal(true);
+         setShowPasswordModal(true);
       } else {
         setShowUserNotFoundModal(true);
       }
@@ -183,8 +177,7 @@ const HomePage = ({ userData, onLogout }) => {
     }
   };
 
-  // New handler for password submission
-  const handlePasswordSubmit = async (e) => {
+   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     
     if (!password.trim()) {
@@ -203,8 +196,7 @@ const HomePage = ({ userData, onLogout }) => {
         sessionStorage.setItem('presentUserName', presentUserName.trim());
         sessionStorage.setItem('presentUserData', JSON.stringify(tempUserData));
         
-        // Store in localStorage for persistent login
-        localStorage.setItem('presentUserName', presentUserName.trim());
+         localStorage.setItem('presentUserName', presentUserName.trim());
         localStorage.setItem('presentUserData', JSON.stringify(tempUserData));
         localStorage.setItem('isPresentUserAuthenticated', 'true');
         
@@ -260,12 +252,10 @@ const HomePage = ({ userData, onLogout }) => {
   };
 
   const continueWithoutAccount = () => {
-    // Close modals
-    setShowUserNotFoundModal(false);
+     setShowUserNotFoundModal(false);
     setShowPasswordModal(false);
     
-    // Set user as guest
-    const guestData = {
+      const guestData = {
       user: {
         name: presentUserName.trim(),
         username: presentUserName.trim(),
@@ -282,8 +272,7 @@ const HomePage = ({ userData, onLogout }) => {
   const skipPassword = () => {
     setShowPasswordModal(false);
     
-    // Prompt to enter a different name for guest mode
-    setPresentUserName('');
+     setPresentUserName('');
     setErrorMessage('Please enter a two-word name to continue as guest');
     setTimeout(() => setErrorMessage(''), 5000);
   };
@@ -324,8 +313,7 @@ const HomePage = ({ userData, onLogout }) => {
     </button>
   );
 
-  // New component for password modal
-  const renderPasswordModal = () => (
+   const renderPasswordModal = () => (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}

@@ -252,29 +252,36 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
 
   const handleSendMessage = async () => {
     if (input.trim() === '') return;
-
+  
     const originalText = input;
     setInput('');
     setIsLoading(true);
     inputRef.current?.focus();
-
+  
     try {
       const detectedLangCode = await detectLanguage(originalText);
-            const userMessage = {
+      const userMessage = {
         type: 'user',
         content: originalText,
         timestamp: new Date().toISOString(),
         originalLanguage: detectedLangCode
       };
       
-      setMessages(prev => [...prev, userMessage]);
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
       setLastQuestion(originalText);
+      
       let textForAI = originalText;
       if (detectedLangCode !== "en") {
         textForAI = await translateText(originalText, detectedLangCode, "en");
       }
-
-      const englishResponse = await getAnswer(textForAI, currentUserData.user, presentUserData ? presentUserData.user : null);
+  
+      const englishResponse = await getAnswer(
+        textForAI, 
+        currentUserData.user, 
+        presentUserData ? presentUserData.user : null,
+        updatedMessages 
+      );
       
       let finalResponse = englishResponse;
       if (detectedLangCode !== "en") {
@@ -287,7 +294,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
         timestamp: new Date().toISOString(),
         originalLanguage: detectedLangCode
       };
-
+  
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('Error in message flow:', error);
@@ -297,7 +304,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
         content: "I'm sorry, I couldn't process your request. Please try again later.",
         timestamp: new Date().toISOString()
       };
-
+  
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);

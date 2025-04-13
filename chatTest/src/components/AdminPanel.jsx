@@ -96,7 +96,6 @@ const AdminPanel = ({ userData, onClose }) => {
       const result = await apiService.getUserData(userData.user.username);
       
       if (result.success && result.data) {
-        // Update the tasks with fresh data
         setTasks(result.data.user.tasks || []);
         toast.success("User data refreshed successfully");
       } else {
@@ -507,7 +506,7 @@ const AdminPanel = ({ userData, onClose }) => {
                                   <p className="text-white">{task.presentUserData?.mobileNo || "N/A"}</p>
                                 </div>
                                 <div>
-                                  <h4 className="text-gray-400 text-xs mb-1">Username</h4>
+                                  <h4 className="text-gray-400 text-xs mb-1">User's Chat Assistant</h4>
                                   {task.presentUserData?.username ? (
                                     <a 
                                       href={`https://chatoomate.vercel.app/home/${task.presentUserData.username}`}

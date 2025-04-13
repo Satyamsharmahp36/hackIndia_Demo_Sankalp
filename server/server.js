@@ -103,7 +103,6 @@ app.post('/register', async (req, res) => {
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) return res.status(400).json({ message: "Email or username already exists" });
 
-    // Hash the password before saving
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -112,7 +111,7 @@ app.post('/register', async (req, res) => {
       email, 
       mobileNo, 
       username, 
-      password: hashedPassword, 
+      password, 
       geminiApiKey 
     });
     await newUser.save();
@@ -476,6 +475,19 @@ app.get('/verify-user/:identifier', async (req, res) => {
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/users/count', async (req, res) => {
+  try {
+    const count = await User.countDocuments();
+        res.json({ count });
+  } catch (error) {
+    console.error('Error counting users:', error);
+    res.status(500).json({ 
+      message: "Error counting users", 
+      error: error.message 
+    });
+  }
 });
 
 const PING_SERVICE_URL = process.env.PING_SERVICE_URL;

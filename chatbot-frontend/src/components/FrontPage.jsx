@@ -10,16 +10,38 @@ import SignupPage from './SignupPage';
 import LoginPage from './LoginPage';
 import ContactUsPage from './ContactUsPage';
 import HowItWorksPage from './HowItWorksPage';
+import PromotionPopup from './PromotionPopup';
 
 function FrontPage() {
   const [activeMascot, setActiveMascot] = useState('default');
   const [activeModal, setActiveModal] = useState(null);
+  const [showPromotion, setShowPromotion] = useState(false);
+  const [isProPromotion, setIsProPromotion] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
   
   const containerRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"]
   });
+
+  useEffect(() => {
+    const fetchTotalUsers = async () => {
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND || '';
+        const response = await fetch(`${backendUrl}/users/count`);
+        const data = await response.json();
+        
+        if (data && data.count) {
+          setTotalUsers(data.count);
+        }
+      } catch (error) {
+        console.error('Error fetching user count:', error);
+      }
+    };
+
+    fetchTotalUsers();
+  }, []);
 
   const ParticleBackground = () => {
     const [particles, setParticles] = useState([]);
@@ -147,6 +169,16 @@ function FrontPage() {
     setActiveModal(null);
   }, []);
 
+  const showPromotionPopup = useCallback((isPro) => {
+    setIsProPromotion(isPro);
+    setShowPromotion(true);
+  }, []);
+
+  const handleGetStarted = useCallback(() => {
+    setShowPromotion(false);
+    openModal('signup');
+  }, [openModal]);
+
   const y1 = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const y2 = useTransform(scrollYProgress, [0, 1], [0, -50]);
 
@@ -189,6 +221,15 @@ function FrontPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <PromotionPopup 
+        isOpen={showPromotion}
+        onClose={() => setShowPromotion(false)}
+        onSignup={handleGetStarted}
+        isPro={isProPromotion}
+        totalUsers={totalUsers}
+        maxUsers={100}
+      />
 
       <motion.div
         style={{ y: y1 }}
@@ -414,6 +455,7 @@ function FrontPage() {
             variants={itemVariants}
             whileHover={{ scale: 1.02 }}
             className="p-8 rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-lg border border-gray-700"
+            onClick={() => showPromotionPopup(false)}
           >
             <div className="flex flex-col h-full">
               <h3 className="text-2xl font-bold mb-4">Free Plan</h3>
@@ -432,10 +474,7 @@ function FrontPage() {
                 </li>
               </ul>
               <motion.button
-                onClick={() => {
-                  console.log('Get Started button clicked');
-                  openModal('signup');
-                }}
+                onClick={() => showPromotionPopup(false)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full text-white font-bold hover:from-blue-600 hover:to-purple-600 transition-all duration-300"
@@ -449,6 +488,7 @@ function FrontPage() {
             variants={itemVariants}
             whileHover={{ scale: 1.05 }}
             className="p-8 rounded-2xl bg-gradient-to-br from-blue-900/50 to-purple-900/50 backdrop-blur-lg border border-purple-700"
+            onClick={() => showPromotionPopup(true)}
           >
             <div className="flex flex-col h-full">
               <div className="flex items-center justify-between mb-4">
@@ -462,11 +502,11 @@ function FrontPage() {
                 </li>
                 <li className="flex items-center">
                   <Check className="w-5 h-5 text-green-500 mr-2" />
-                  <span>Customizable personality</span>
+                  <span>Task scheduling</span>
                 </li>
                 <li className="flex items-center">
                   <Check className="w-5 h-5 text-green-500 mr-2" />
-                  <span>Direct data training interface</span>
+                  <span>To-list Integration</span>
                 </li>
                 <li className="flex items-center">
                   <Check className="w-5 h-5 text-green-500 mr-2" />
@@ -474,11 +514,11 @@ function FrontPage() {
                 </li>
                 <li className="flex items-center">
                   <Check className="w-5 h-5 text-green-500 mr-2" />
-                  <span>Custom homepage design</span>
+                  <span>Multi-language Support</span>
                 </li>
               </ul>
               <motion.button
-                onClick={() => openModal('signup')}
+                onClick={() => showPromotionPopup(true)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 transition-colors font-semibold"

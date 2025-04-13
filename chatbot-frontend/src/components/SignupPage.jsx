@@ -114,7 +114,7 @@ const SignupPage = () => {
                !mobileRegex.test(value) ? "Invalid mobile number (10 digits)" : false;
       },
       username: (value) => {
-        const usernameRegex = /^[^\s]+$/; // No spaces allowed
+        const usernameRegex = /^[^\s]+$/; 
         return !value.trim() ? "Username is required" : 
                value.length < 4 ? "Username must be at least 4 characters" :
                !usernameRegex.test(value) ? "Username cannot contain spaces" : false;
@@ -127,7 +127,6 @@ const SignupPage = () => {
         return value !== formData.password ? "Passwords do not match" : false;
       },
       geminiApiKey: (value) => {
-        // If using public key, don't validate
         if (uiState.usePublicKey) return false;
         return !value.trim() && "Gemini API key is required";
       }
@@ -165,7 +164,6 @@ const SignupPage = () => {
       showGeminiKeyModal: false
     }));
     
-    // If switching to public key, clear any geminiApiKey errors
     if (!uiState.usePublicKey) {
       setErrors(prev => {
         const newErrors = {...prev};
@@ -182,7 +180,6 @@ const SignupPage = () => {
 
     if (validateForm()) {
       try {
-        // Use public key if option is selected
         const apiKeyToUse = uiState.usePublicKey 
           ? import.meta.env.VITE_GEMINI_KEY 
           : formData.geminiApiKey;
@@ -217,7 +214,7 @@ const SignupPage = () => {
   };
   
   const handleRedirectToContent = () => {
-    window.open(`http://localhost:5173/home/${formData.username}`, '_blank');
+    window.open(`https://chatoomate.vercel.app/home/${formData.username}`, '_blank');
   };
 
   const renderInputField = (field, index) => {
@@ -231,7 +228,6 @@ const SignupPage = () => {
       geminiApiKey: { label: "Gemini API Key ", type: "text" }
     };
 
-    // Skip geminiApiKey field if using public key
     if (field === 'geminiApiKey' && uiState.usePublicKey) {
       return null;
     }
@@ -349,7 +345,6 @@ const SignupPage = () => {
           <form onSubmit={handleSubmit} className="space-y-3">
             {['name', 'email', 'mobileNo', 'username', 'password', 'confirmPassword', 'geminiApiKey'].map(renderInputField)}
 
-            {/* Public API Key Option */}
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
