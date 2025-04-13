@@ -24,6 +24,32 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password, userData }) =>
   const [statusFilter, setStatusFilter] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [sortOrder, setSortOrder] = useState('newest');
+
+  const scrollbarStyles = `
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #1f2937; /* gray-800 */
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #4b5563; /* gray-600 */
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* gray-500 */
+  }
+  
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937; 
+  }
+`;
   
   const checkPassword = () => {
     if (passwordInput === password) {
@@ -237,6 +263,8 @@ const AdminModal = ({ isOpen, onClose, onPromptUpdated, password, userData }) =>
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <style>{scrollbarStyles}</style>
+
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}

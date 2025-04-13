@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, MessageCircle, LightbulbIcon, ExternalLink, Settings, ChevronDown, X, Trash2, Save, Lock, Unlock, AlertTriangle, Filter, Plus, CheckCircle, XCircle, Clock, Info, HelpCircle } from 'lucide-react';
+import { Send, User, Bot, Loader2, MessageCircle, LightbulbIcon, ExternalLink, Settings, ChevronDown, X, Trash2, Save, Lock, Unlock, AlertTriangle, Filter, Plus, CheckCircle, XCircle, Clock, Info, HelpCircle, Globe } from 'lucide-react';
 import { getAnswer } from '../services/ai';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContributionForm from './ContributionForm';
 import AdminModal from './AdminModal';
 import MessageContent from './MessageContent';
+import languages from '../services/languages'
 
 const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => {
   const chatHistoryKey = `${userName || 'anonymous'}_${userData.user.name}`;
@@ -35,10 +36,45 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
   const [currentUserData, setCurrentUserData] = useState(userData);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState({
+    name: "Auto",
+    native: "Detect",
+    code: "auto"
+  });
+  const [detectedLanguage, setDetectedLanguage] = useState(null);
+  const [showTranslationInfo, setShowTranslationInfo] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const modalRef = useRef(null);
+  const languageDropdownRef = useRef(null);
+
+  const scrollbarStyles = `
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #1f2937; /* gray-800 */
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #4b5563; /* gray-600 */
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* gray-500 */
+  }
+  
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937; 
+  }
+`;
 
   useEffect(() => {
     setCurrentUserData(userData);
@@ -93,26 +129,35 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     function handleClickOutside(event) {
       if (showDeleteModal && modalRef.current && !modalRef.current.contains(event.target)) {
         setShowDeleteModal(false);
       }
+      
+      if (showLanguageDropdown && languageDropdownRef.current && !languageDropdownRef.current.contains(event.target)) {
+        setShowLanguageDropdown(false);
+      }
     }
 
-     if (showDeleteModal) {
+    if (showDeleteModal || showLanguageDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showDeleteModal]);
+  }, [showDeleteModal, showLanguageDropdown]);
 
-   useEffect(() => {
+  useEffect(() => {
     function handleEscapeKey(event) {
-      if (event.key === 'Escape' && showDeleteModal) {
-        setShowDeleteModal(false);
+      if (event.key === 'Escape') {
+        if (showDeleteModal) {
+          setShowDeleteModal(false);
+        }
+        if (showLanguageDropdown) {
+          setShowLanguageDropdown(false);
+        }
       }
     }
 
@@ -120,29 +165,29 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
     return () => {
       document.removeEventListener('keydown', handleEscapeKey);
     };
-  }, [showDeleteModal]);
+  }, [showDeleteModal, showLanguageDropdown]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-   const handleOpenDeleteModal = () => {
+  const handleOpenDeleteModal = () => {
     if (!isDeleting) {
       setShowDeleteModal(true);
     }
   };
 
-   const handleCloseDeleteModal = () => {
+  const handleCloseDeleteModal = () => {
     setShowDeleteModal(false);
   };
 
-   const handleDeleteHistory = () => {
-     setIsDeleting(true);
+  const handleDeleteHistory = () => {
+    setIsDeleting(true);
     
     try {
-       setShowDeleteModal(false);
+      setShowDeleteModal(false);
       
-       setTimeout(() => {
+      setTimeout(() => {
         const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
         delete allChatHistories[chatHistoryKey];
         localStorage.setItem('chatHistories', JSON.stringify(allChatHistories));
@@ -153,9 +198,9 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
           timestamp: new Date().toISOString()
         };
   
-         setMessages([initialMessage]);
+        setMessages([initialMessage]);
         
-         setShowDeleteSuccessModal(true);
+        setShowDeleteSuccessModal(true);
         
         setTimeout(() => {
           setShowDeleteSuccessModal(false);
@@ -168,34 +213,84 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
     }
   };
 
+  const detectLanguage = async (text) => {
+    if (!text.trim()) return "en";
+    if (selectedLanguage.code !== "auto") return selectedLanguage.code;
+    
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURI(text)}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      const detectedCode = data[2];
+            const detected = languages.find(lang => lang.code === detectedCode) || 
+                      { name: "Unknown", native: "Unknown", code: detectedCode };
+      
+      setDetectedLanguage(detected);
+      setShowTranslationInfo(detectedCode !== "en");
+      
+      return detectedCode;
+    } catch (error) {
+      console.error("Error detecting language:", error);
+      return "en"; 
+    }
+  };
+  const translateText = async (text, sourceLang, targetLang) => {
+    if (!text.trim()) return "";
+    if (sourceLang === targetLang) return text;
+    
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURI(text)}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      return data[0].map(item => item[0]).join("");
+    } catch (error) {
+      console.error("Error translating text:", error);
+      return text; 
+    }
+  };
+
   const handleSendMessage = async () => {
     if (input.trim() === '') return;
 
-    const userMessage = {
-      type: 'user',
-      content: input,
-      timestamp: new Date().toISOString() 
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setLastQuestion(input);
+    const originalText = input;
     setInput('');
     setIsLoading(true);
-
     inputRef.current?.focus();
 
     try {
-      const response = await getAnswer(input, currentUserData.user, presentUserData ? presentUserData.user : null);
+      const detectedLangCode = await detectLanguage(originalText);
+            const userMessage = {
+        type: 'user',
+        content: originalText,
+        timestamp: new Date().toISOString(),
+        originalLanguage: detectedLangCode
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      setLastQuestion(originalText);
+      let textForAI = originalText;
+      if (detectedLangCode !== "en") {
+        textForAI = await translateText(originalText, detectedLangCode, "en");
+      }
+
+      const englishResponse = await getAnswer(textForAI, currentUserData.user, presentUserData ? presentUserData.user : null);
+      
+      let finalResponse = englishResponse;
+      if (detectedLangCode !== "en") {
+        finalResponse = await translateText(englishResponse, "en", detectedLangCode);
+      }
       
       const botMessage = {
         type: 'bot',
-        content: response,
-        timestamp: new Date().toISOString()
+        content: finalResponse,
+        timestamp: new Date().toISOString(),
+        originalLanguage: detectedLangCode
       };
 
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      console.error('Error getting answer:', error);
+      console.error('Error in message flow:', error);
       
       const errorMessage = {
         type: 'bot',
@@ -258,14 +353,60 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
     textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
   };
 
+  const handleLanguageSelect = (language) => {
+    setSelectedLanguage(language);
+    setShowLanguageDropdown(false);
+  };
+
+  const toggleLanguageDropdown = () => {
+    setShowLanguageDropdown(prev => !prev);
+  };
+
   return (
     <div className="flex flex-col h-screen md:h-11/12 lg:max-w-1/2 lg:rounded-xl md:pt-0 pt-16 text-xl bg-gray-900 text-white shadow-2xl overflow-hidden">
+            <style>{scrollbarStyles}</style>
+
       <div className="bg-gray-800 py-4 rounded-t-xl px-6 flex justify-between items-center border-b border-gray-700">
         <div className="flex items-center">
           <Bot className="w-6 h-6 text-blue-400 mr-2" />
           <h1 className="text-xl font-bold"> {currentUserData.user.name}'s AI Assistant</h1>
         </div>
         <div className="flex gap-2">
+          <div className="relative" ref={languageDropdownRef}>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleLanguageDropdown}
+              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
+            >
+              <Globe className="w-4 h-4" />
+              <span className="hidden sm:inline">{selectedLanguage.name}</span>
+              <ChevronDown className="w-4 h-4" />
+            </motion.button>
+            
+            {showLanguageDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden z-10">
+                <div className="max-h-64 overflow-y-auto">
+                  {languages.map((language) => (
+                    <button
+                      key={language.code}
+                      onClick={() => handleLanguageSelect(language)}
+                      className={`w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center ${
+                        selectedLanguage.code === language.code ? 'bg-blue-900' : ''
+                      }`}
+                    >
+                      {language.code === selectedLanguage.code && (
+                        <CheckCircle className="w-4 h-4 mr-2 text-blue-400" />
+                      )}
+                      <span className="mr-1">{language.name}</span>
+                      <span className="text-sm text-gray-400">({language.native})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -301,6 +442,26 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
           )}
         </AnimatePresence>
 
+        <AnimatePresence>
+          {showTranslationInfo && detectedLanguage && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-blue-900 bg-opacity-20 border border-blue-500 rounded-lg p-3 text-blue-300 flex items-center"
+            >
+              <Info className="w-5 h-5 mr-2" />
+              Detected {detectedLanguage.name} ({detectedLanguage.native}). Translation is active.
+              <button 
+                onClick={() => setShowTranslationInfo(false)} 
+                className="ml-auto text-blue-300 hover:text-blue-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {messages.map((message, index) => (
           <motion.div
             key={index}
@@ -327,6 +488,11 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
                   {message.timestamp && (
                     <span className="ml-2 text-xs opacity-50">
                       {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </span>
+                  )}
+                  {message.originalLanguage && message.originalLanguage !== "en" && (
+                    <span className="ml-2 text-xs bg-blue-900 px-2 py-0.5 rounded-full">
+                      {languages.find(l => l.code === message.originalLanguage)?.name || message.originalLanguage}
                     </span>
                   )}
                 </div>

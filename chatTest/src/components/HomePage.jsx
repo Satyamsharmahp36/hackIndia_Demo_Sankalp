@@ -12,7 +12,8 @@ import {
   LogOut,
   Home,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  Lock
 } from 'lucide-react';
 import ChatBot from './ChatBot';
 import AdminPanel from './AdminPanel';
@@ -34,6 +35,12 @@ const HomePage = ({ userData, onLogout }) => {
   const [showChatBot, setShowChatBot] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showUserNotFoundModal, setShowUserNotFoundModal] = useState(false);
+  
+  // New state variables for password authentication
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [tempUserData, setTempUserData] = useState(null);
 
   const backgroundBubbles = useMemo(() => {
     return [...Array(20)].map((_, i) => ({
@@ -48,7 +55,7 @@ const HomePage = ({ userData, onLogout }) => {
     }));
   }, []);
 
-   const fetchProfileOwner = async (username) => {
+  const fetchProfileOwner = async (username) => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND}/verify-user/${username}`,
@@ -72,7 +79,7 @@ const HomePage = ({ userData, onLogout }) => {
     }
   };
 
-   const fetchPresentUser = async (username) => {
+  const fetchPresentUser = async (username) => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND}/verify-user/${username}`,
@@ -84,8 +91,8 @@ const HomePage = ({ userData, onLogout }) => {
 
       const data = await response.json();
       if (response.ok) {
-        setPresentUserData(data);
-        sessionStorage.setItem('presentUserData', JSON.stringify(data));
+        // Store temporary user data but don't authenticate yet until password is verified
+        setTempUserData(data);
         return true;
       }
       return false;
@@ -95,23 +102,55 @@ const HomePage = ({ userData, onLogout }) => {
     }
   };
 
+  // New function to verify user password
+  const verifyPassword = async (username, password) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND}/verify-password`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        }
+      );
+
+      const data = await response.json();
+      return response.ok;
+    } catch (error) {
+      console.error('Error verifying password:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
+    // Check if user is already logged in
+    const storedAuthStatus = localStorage.getItem('isPresentUserAuthenticated');
+    const storedPresentUserName = localStorage.getItem('presentUserName');
+    const storedPresentUserData = localStorage.getItem('presentUserData');
+    
+    if (storedAuthStatus === 'true' && storedPresentUserName && storedPresentUserData) {
+      setPresentUserName(storedPresentUserName);
+      setPresentUserData(JSON.parse(storedPresentUserData));
+      setIsPresentUserAuthenticated(true);
+    } else {
+      // Check session storage if local storage is not available
+      const sessionPresentUser = sessionStorage.getItem('presentUserName');
+      if (sessionPresentUser) {
+        setPresentUserName(sessionPresentUser);
+        const sessionPresentUserData = sessionStorage.getItem('presentUserData');
+        if (sessionPresentUserData) {
+          setPresentUserData(JSON.parse(sessionPresentUserData));
+          setIsPresentUserAuthenticated(true);
+        }
+      }
+    }
+
     if (username) {
       fetchProfileOwner(username);
     } else if (userData) {
       setProfileOwnerData(userData);
       setProfileOwnerName(userData.user?.name || '');
       setIsProfileOwnerLoaded(true);
-    }
-    
-    const storedPresentUser = sessionStorage.getItem('presentUserName');
-    if (storedPresentUser) {
-      setPresentUserName(storedPresentUser);
-      const storedPresentUserData = sessionStorage.getItem('presentUserData');
-      if (storedPresentUserData) {
-        setPresentUserData(JSON.parse(storedPresentUserData));
-        setIsPresentUserAuthenticated(true);
-      }
     }
   }, [username, userData]);
 
@@ -130,8 +169,8 @@ const HomePage = ({ userData, onLogout }) => {
       const userExists = await fetchPresentUser(presentUserName.trim());
       
       if (userExists) {
-        sessionStorage.setItem('presentUserName', presentUserName.trim());
-        setIsPresentUserAuthenticated(true);
+        // Instead of immediate authentication, show password modal
+        setShowPasswordModal(true);
       } else {
         setShowUserNotFoundModal(true);
       }
@@ -144,13 +183,53 @@ const HomePage = ({ userData, onLogout }) => {
     }
   };
 
+  // New handler for password submission
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!password.trim()) {
+      setPasswordError('Please enter your password');
+      setTimeout(() => setPasswordError(''), 3000);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const isPasswordValid = await verifyPassword(presentUserName.trim(), password.trim());
+      
+      if (isPasswordValid) {
+        setPresentUserData(tempUserData);
+        sessionStorage.setItem('presentUserName', presentUserName.trim());
+        sessionStorage.setItem('presentUserData', JSON.stringify(tempUserData));
+        
+        // Store in localStorage for persistent login
+        localStorage.setItem('presentUserName', presentUserName.trim());
+        localStorage.setItem('presentUserData', JSON.stringify(tempUserData));
+        localStorage.setItem('isPresentUserAuthenticated', 'true');
+        
+        setIsPresentUserAuthenticated(true);
+        setShowPasswordModal(false);
+      } else {
+        setPasswordError('Incorrect password. Please try again.');
+        setTimeout(() => setPasswordError(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error verifying password:', error);
+      setPasswordError('Error verifying password. Please try again.');
+      setTimeout(() => setPasswordError(''), 3000);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleGetStarted = () => {
     setShowChatBot(true);
   };
 
   const refetchUserData = async () => {
     try {
-      const savedUsername = sessionStorage.getItem('presentUserName');
+      const savedUsername = localStorage.getItem('presentUserName') || sessionStorage.getItem('presentUserName');
       
       if (!savedUsername) {
         throw new Error('No username found');
@@ -168,6 +247,7 @@ const HomePage = ({ userData, onLogout }) => {
 
       if (response.ok) {
         sessionStorage.setItem('presentUserData', JSON.stringify(data));
+        localStorage.setItem('presentUserData', JSON.stringify(data));
         setPresentUserData(data);
         return data;
       } else {
@@ -180,21 +260,50 @@ const HomePage = ({ userData, onLogout }) => {
   };
 
   const continueWithoutAccount = () => {
-    sessionStorage.setItem('presentUserName', presentUserName.trim());
+    // Close modals
     setShowUserNotFoundModal(false);
+    setShowPasswordModal(false);
+    
+    // Set user as guest
+    const guestData = {
+      user: {
+        name: presentUserName.trim(),
+        username: presentUserName.trim(),
+        isGuest: true
+      }
+    };
+    
+    setPresentUserData(guestData);
+    sessionStorage.setItem('presentUserName', presentUserName.trim());
+    sessionStorage.setItem('presentUserData', JSON.stringify(guestData));
     setIsPresentUserAuthenticated(true);
+  };
+
+  const skipPassword = () => {
+    setShowPasswordModal(false);
+    
+    // Prompt to enter a different name for guest mode
+    setPresentUserName('');
+    setErrorMessage('Please enter a two-word name to continue as guest');
+    setTimeout(() => setErrorMessage(''), 5000);
   };
 
   const tryDifferentUsername = () => {
     setShowUserNotFoundModal(false);
+    setShowPasswordModal(false);
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('presentUserName');
+    localStorage.removeItem('presentUserData');
+    localStorage.removeItem('isPresentUserAuthenticated');
     sessionStorage.removeItem('presentUserName');
     sessionStorage.removeItem('presentUserData');
+    
     if (onLogout) {
       onLogout();
     }
+    
     setIsPresentUserAuthenticated(false);
     setShowChatBot(false);
     setPresentUserData(null);
@@ -213,6 +322,89 @@ const HomePage = ({ userData, onLogout }) => {
     >
       <Home className="w-5 h-5" />
     </button>
+  );
+
+  // New component for password modal
+  const renderPasswordModal = () => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 border border-gray-700"
+      >
+        <div className="flex items-center justify-center mb-4 text-blue-500">
+          <Lock className="w-12 h-12" />
+        </div>
+        <h3 className="text-xl font-bold text-center mb-3">Enter Your Password</h3>
+        <p className="text-gray-300 text-center mb-6">
+          Please enter your password for ChatMate username "{presentUserName}".
+        </p>
+        
+        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-600 rounded-lg py-3 px-10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              placeholder="Your password"
+              disabled={isSubmitting}
+            />
+          </div>
+          
+          {passwordError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-red-400 text-sm flex items-center"
+            >
+              <span className="mr-2">⚠️</span> {passwordError}
+            </motion.div>
+          )}
+          
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg shadow-lg hover:shadow-blue-500/30 transition-all font-medium flex items-center justify-center space-x-2 disabled:opacity-70"
+          >
+            {isSubmitting ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+              />
+            ) : (
+              <>
+                <span>Login</span>
+                <ChevronRight className="w-5 h-5" />
+              </>
+            )}
+          </motion.button>
+        </form>
+        
+        <div className="flex justify-between mt-4 text-sm">
+          <button 
+            onClick={skipPassword}
+            className="text-gray-400 hover:text-gray-300 transition"
+          >
+            Continue as guest
+          </button>
+          <button 
+            onClick={tryDifferentUsername}
+            className="text-blue-400 hover:text-blue-300 transition"
+          >
+            Try different username
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 
   const renderUserNotFoundModal = () => (
@@ -501,12 +693,13 @@ const HomePage = ({ userData, onLogout }) => {
         
         {showAdminPanel && (
           <AdminPanel 
-            userData={presentUserData} 
+            userData={profileOwnerData} 
             onClose={() => setShowAdminPanel(false)} 
           />
         )}
 
         {showUserNotFoundModal && renderUserNotFoundModal()}
+        {showPasswordModal && renderPasswordModal()}
       </div>
     </motion.div>
   );

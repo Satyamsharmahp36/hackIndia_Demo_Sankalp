@@ -13,12 +13,14 @@ import {
   CheckCircle, 
   Clock as ClockIcon, 
   XCircle,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { toast } from 'react-toastify';
 import DailyWorkflow from './DailyWorkflow';
 import axios from 'axios';
+import apiService from '../services/apiService';
 
 const AdminPanel = ({ userData, onClose }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -33,7 +35,34 @@ const AdminPanel = ({ userData, onClose }) => {
   const [expandedTask, setExpandedTask] = useState(null);
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDescriptions, setUserDescriptions] = useState({});
-  const [isDeleting, setIsDeleting] = useState(null); 
+  const [isDeleting, setIsDeleting] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const scrollbarStyles = `
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #1f2937; /* gray-800 */
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #4b5563; /* gray-600 */
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* gray-500 */
+  }
+  
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937; 
+  }
+`;
 
   useEffect(() => {
     setIsAuthenticated(false);
@@ -57,6 +86,28 @@ const AdminPanel = ({ userData, onClose }) => {
 
   const fetchTasks = () => {
     setTasks(userData.user.tasks);
+  };
+
+  const refreshUserData = async () => {
+    try {
+      setRefreshing(true);
+      toast.info("Refreshing user data...");
+      
+      const result = await apiService.getUserData(userData.user.username);
+      
+      if (result.success && result.data) {
+        // Update the tasks with fresh data
+        setTasks(result.data.user.tasks || []);
+        toast.success("User data refreshed successfully");
+      } else {
+        toast.error("Failed to refresh user data");
+      }
+    } catch (error) {
+      console.error("Error refreshing user data:", error);
+      toast.error("Error refreshing user data");
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const toggleTaskStatus = async (task) => {
@@ -88,27 +139,6 @@ const AdminPanel = ({ userData, onClose }) => {
     }
   };
 
-  const deleteTask = async (task) => {
-    try {
-      setIsDeleting(task.uniqueTaskId);
-            const response = await axios.delete(`${import.meta.env.VITE_BACKEND}/tasks`, {
-        params: {
-          userId: userData.user.username,
-          uniqueTaskId: task.uniqueTaskId
-        }
-      });
-      
-      if (response.data && response.data.message) {
-        setTasks(prevTasks => prevTasks.filter(t => t.uniqueTaskId !== task.uniqueTaskId));
-        toast.success("Task deleted successfully");
-      }
-    } catch (error) {
-      console.error("Error deleting task:", error);
-      toast.error("Failed to delete task");
-    } finally {
-      setIsDeleting(null);
-    }
-  };
 
   const generateUserDescription = async (prompt) => {
     try {
@@ -243,6 +273,8 @@ const AdminPanel = ({ userData, onClose }) => {
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
     >
+      <style>{scrollbarStyles}</style>
+
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -307,7 +339,19 @@ const AdminPanel = ({ userData, onClose }) => {
               animate={{ opacity: 1 }}
               className="space-y-6"
             >
-              <DailyWorkflow userData={userData} />
+                <DailyWorkflow userData={userData} />
+                <div className='w-full flex justify-start items-center'>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={refreshUserData}
+                  disabled={refreshing}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-all"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Refreshing...' : 'Refresh Tasks'}
+                </motion.button>
+                </div>
               
               <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <div className="relative w-full md:max-w-xs">
@@ -394,7 +438,6 @@ const AdminPanel = ({ userData, onClose }) => {
                               <RefreshCw className="w-4 h-4" />
                             </motion.button>
                             
-                            
                             <motion.button
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
@@ -408,8 +451,9 @@ const AdminPanel = ({ userData, onClose }) => {
                         
                         {task.taskDescription && (
                           <p className="text-gray-400 text-sm mb-2">
-  {renderDescription(task.taskDescription)}
-</p>                        )}
+                            {renderDescription(task.taskDescription)}
+                          </p>
+                        )}
                         
                         <p className="text-gray-300 text-base mb-4">{task.taskQuestion}</p>
                         
@@ -464,7 +508,19 @@ const AdminPanel = ({ userData, onClose }) => {
                                 </div>
                                 <div>
                                   <h4 className="text-gray-400 text-xs mb-1">Username</h4>
-                                  <p className="text-white">{task.presentUserData?.username || "N/A"}</p>
+                                  {task.presentUserData?.username ? (
+                                    <a 
+                                      href={`https://chatoomate.vercel.app/home/${task.presentUserData.username}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-500 hover:underline flex items-center"
+                                    >
+                                      {task.presentUserData.username}
+                                      <ExternalLink className="w-3 h-3 ml-1" />
+                                    </a>
+                                  ) : (
+                                    <p className="text-white">N/A</p>
+                                  )}
                                 </div>
                               </div>
                               
