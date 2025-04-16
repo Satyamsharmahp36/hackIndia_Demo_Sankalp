@@ -161,7 +161,7 @@ function FrontPage() {
   }, []);
 
   const handleMascotClick = () => {
-    window.open('https://chatoomate.vercel.app/', '_blank');
+    window.open('http://localhost:5173/', '_blank');
   };
   
   const closeModal = useCallback(() => {

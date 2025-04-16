@@ -215,7 +215,7 @@ const SignupPage = () => {
   };
   
   const handleRedirectToContent = () => {
-    window.open(`https://chatoomate.vercel.app/home/${formData.username}`, '_blank');
+    window.open(`http://localhost:5173/home/${formData.username}`, '_blank');
   };
 
   const renderInputField = (field, index) => {
@@ -605,11 +605,11 @@ const SignupPage = () => {
                   <p className="text-gray-400 text-xs mb-1">Your personal URL:</p>
                   <div className="flex items-center bg-gray-800/70 rounded-lg p-2 overflow-hidden">
                       <p className="text-green-300 font-mono text-xs truncate">
-                        https://chatoomate.vercel.app/home/{formData.username}
+                        http://localhost:5173/home/{formData.username}
                       </p>
                       <motion.button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`https://chatoomate.vercel.app/home/${formData.username}`);
+                          navigator.clipboard.writeText(`http://localhost:5173/home/${formData.username}`);
                           setCopied(true);
                           setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
                         }}
