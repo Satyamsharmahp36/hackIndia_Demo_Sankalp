@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import FrontPage from './components/FrontPage';
 
 function App() {
