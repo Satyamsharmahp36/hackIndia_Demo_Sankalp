@@ -488,10 +488,19 @@ app.get('/users/count', async (req, res) => {
   }
 });
 
+// const PING_SERVICE_URL = process.env.PING_SERVICE_URL;
 
+// const pingSecondaryService = async () => {
+//   try {
+//     const response = await axios.get(PING_SERVICE_URL);
+//     console.log(`Pinged secondary service at ${new Date().toISOString()} - Response: ${response.status}`);
+//   } catch (error) {
+//     console.error(`Error pinging secondary service: ${error.message}`);
+//   }
+// };
 
 app.listen(5000, () => {
   console.log('Server running on port 5000');
   
-  setInterval(pingSecondaryService, 10 * 60 * 1000);
+  // setInterval(pingSecondaryService, 10 * 60 * 1000);
 });
