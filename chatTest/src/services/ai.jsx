@@ -82,6 +82,20 @@ async function detectTaskRequest(question, userData, conversationContext = "") {
   }
 }
 
+function isTimeInPast(dateStr, timeStr) {
+  // Create date object from the provided date and time
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hour, minute] = timeStr.split(':').map(Number);
+  
+  const proposedTime = new Date(year, month - 1, day, hour, minute);
+  const currentTime = new Date();
+  
+  // Add a small buffer (e.g., 10 minutes) to allow for immediate meetings
+  currentTime.setMinutes(currentTime.getMinutes() + 10);
+  
+  return proposedTime < currentTime;
+}
+
 async function extractMeetingDetails(message, userData) {
   try {
     if (!userData || !userData.geminiApiKey) {
@@ -95,10 +109,22 @@ async function extractMeetingDetails(message, userData) {
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
     const currentDay = currentDate.getDate();
+    const currentHour = currentDate.getHours();
+    const currentMinute = currentDate.getMinutes();
 
     const detectionPrompt = `
-    Extract meeting details from the following text. Be flexible with format and phrasing.
+    Extract meeting details from the following text, including handling relative time expressions.
     Today's date is ${currentYear}-${currentMonth.toString().padStart(2, '0')}-${currentDay.toString().padStart(2, '0')}.
+    Current time is ${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}.
+    
+    Relative time expressions to handle:
+    - "tomorrow" = the day after the current date
+    - "next hour" = 1 hour from current time
+    - "few minutes" = around 10 minutes
+    - "few hours" = around 2-3 hours
+    - "next week" = 7 days from current date
+    - "anytime" =  12 hour from current time 
+    - "whenever you are free" = next day 11:00 AM
     
     Text: "${message}"
     
@@ -111,11 +137,7 @@ async function extractMeetingDetails(message, userData) {
       "duration": "Duration in minutes (as a number) or null if not specified"
     }
     
-    Examples of input/output for date, time and duration:
-    Input: "I want meeting to be on 2nd of november, 2025, from 6.30 Pm for 30 min"
-    Output: {"date": "2025-11-02", "time": "18:30", "duration": 30}
-    
-    IMPORTANT: Return only the raw JSON object without any markdown code blocks or additional text. Do not include \`\`\`json or \`\`\` tags around your response.
+    IMPORTANT: Return only the raw JSON object without any markdown code blocks or additional text.
     `;
 
     const result = await model.generateContent(detectionPrompt);
@@ -197,7 +219,7 @@ async function createTask(taskQuestion, taskDescription, userData, presentData, 
     } : null;
 
     const enhancedDescription = topicContext 
-      ? `${taskDescription} (Context: ${topicContext})` 
+      ? `${taskDescription}` 
       : taskDescription;
 
     // Prepare meeting info for the task
@@ -356,9 +378,26 @@ async function parseMeetingDetailsResponse(response, userData) {
     const genAI = new GoogleGenerativeAI(userData.geminiApiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
+    // Get current date and time information
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // JavaScript months are 0-indexed
+    const currentDay = now.getDate();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
     const parsingPrompt = `
-    Extract meeting details from the following text, converting natural language into structured data.
+    Extract meeting details from the following text, converting natural language including relative time expressions into structured data.
     Be flexible with format and phrasing - the goal is to successfully extract the information no matter how it's expressed.
+    
+    CURRENT DATE AND TIME: ${currentYear}-${currentMonth.toString().padStart(2, '0')}-${currentDay.toString().padStart(2, '0')} ${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}
+    
+    Relative time expressions to handle:
+    - "tomorrow" = the day after the current date (${currentYear}-${currentMonth.toString().padStart(2, '0')}-${(currentDay + 1).toString().padStart(2, '0')})
+    - "next hour" = ${currentHour + 1}:${currentMinute.toString().padStart(2, '0')}
+    - "few minutes" = around 10 minutes
+    - "few hours" = around 2-3 hours
+    - "next week" = 7 days from current date
     
     Text: "${response}"
     
@@ -373,14 +412,19 @@ async function parseMeetingDetailsResponse(response, userData) {
     Input: "I want meeting to be on 2nd of november, 2025, from 6.30 Pm for 30 min"
     Output: {"date": "2025-11-02", "time": "18:30", "duration": 30}
     
-    Input: "Let's meet next Friday at 3 in the afternoon for an hour"
-    Output: {"date": "2025-04-25", "time": "15:00", "duration": 60}
+    Input: "Let's meet tomorrow at 3 in the afternoon for an hour"
+    Output: {"date": "${currentYear}-${currentMonth.toString().padStart(2, '0')}-${(currentDay + 1).toString().padStart(2, '0')}", "time": "15:00", "duration": 60}
+    
+    Input: "Let's have a quick call in the next hour for a few minutes"
+    Output: {"date": "${currentYear}-${currentMonth.toString().padStart(2, '0')}-${currentDay.toString().padStart(2, '0')}", "time": "${(currentHour + 1).toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}", "duration": 10}
     
     IMPORTANT: Return only the raw JSON object without any markdown code blocks or additional text. Do not include \`\`\`json or \`\`\` tags around your response.
     `;
     
     const result = await model.generateContent(parsingPrompt);
     const responseText = result.response.text().trim();
+    
+    // Rest of the function remains the same...
     
     // Clean up the response text in case it's wrapped in code blocks
     let cleanedResponse = responseText;
@@ -578,27 +622,40 @@ export async function getAnswer(question, userData, presentData, conversationHis
       
       // Log to see what's still missing
       console.log("Missing meeting details:", missingDetails);
+
       
-      if (missingDetails.length > 0) {
-        // Special case direct handling for the example you provided
-        if (question.toLowerCase().includes("2nd of november") && 
-            question.toLowerCase().includes("6.30 pm") && 
-            question.toLowerCase().includes("30 min")) {
-          const meetingTitle = pendingMeetingDetails.title || conversationTopic || "the discussed topic";
-          return `I will be scheduling a meeting with ${userData.name} about ${meetingTitle} on 2025-11-02 at 18:30 for 30 minutes. Do you want to confirm this? Press yes to confirm.`;
-        }
-        
-        // Still missing some details, ask for them - but more simply
-        return `Please provide the following details for your meeting: ${missingDetails.join(', ')}.`;
-      } else {
-        // All details collected, ask for final confirmation
-        const meetingTitle = pendingMeetingDetails.title || conversationTopic || "the discussed topic";
-        return `I will be scheduling a meeting with ${userData.name} about ${meetingTitle} on ${pendingMeetingDetails.date} at ${pendingMeetingDetails.time} for ${pendingMeetingDetails.duration} minutes. Do you want to confirm this? Press yes to confirm.`;
-      }
+      
+// Inside the meeting details processing section:
+if (missingDetails.length === 0) {
+  // All details are available, but now check if the time is valid
+  if (isTimeInPast(pendingMeetingDetails.date, pendingMeetingDetails.time)) {
+    // Reset time fields to force the user to provide valid future time
+    pendingMeetingDetails.date = null;
+    pendingMeetingDetails.time = null;
+    
+    // Return a funny message about time travel
+    return `I'm not a time traveler who can go to the past for meetings! 🚀⏰ Please provide a future date and time for our meeting.`;
+  } else {
+    // All details are available and valid, ask for final confirmation
+    const meetingTitle = pendingMeetingDetails.title || conversationTopic || "the discussed topic";
+    return `I will be scheduling a meeting with ${userData.name} about ${meetingTitle} on ${pendingMeetingDetails.date} at ${pendingMeetingDetails.time} for ${pendingMeetingDetails.duration} minutes. Do you want to confirm this? Press yes to confirm.`;
+  }
+} else {
+  // Missing some details, ask for them - but more simply
+  return `Please provide the following details for your meeting: ${missingDetails.join(', ')}.`;
+}
+      
     }
     
     // Handle final confirmation of meeting
     if (meetingState.type === "finalConfirmation") {
+
+      if (isTimeInPast(pendingMeetingDetails.date, pendingMeetingDetails.time)) {
+        pendingMeetingDetails.date = null;
+        pendingMeetingDetails.time = null;
+        
+        return `Oops! Looks like you're trying to schedule a meeting in the past. Unless you have a flux capacitor and 1.21 gigawatts of power, we'll need a future time! 🕰️ Please provide a new date and time.`;
+      }
       if (presentData && !presentData?.isGuest) {
         try {
           // Get the meeting request details

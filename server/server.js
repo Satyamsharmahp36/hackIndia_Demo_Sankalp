@@ -75,7 +75,12 @@ const userSchema = new mongoose.Schema({
       date: String,
       time: String,
       duration: String || Number,
-      status: { type: String, enum: ['scheduled', 'completed', 'cancelled', 'pending'], default: 'pending' }
+      status: { type: String, enum: ['scheduled', 'completed', 'cancelled', 'pending'], default: 'pending' },
+      meetingLink:{type:String },
+      // New fields for meeting information
+      meetingRawData: { type: String, default: '' },
+      meetingMinutes: { type: String, default: '' },
+      meetingSummary: { type: String, default: '' }
     },
     createdAt: { type: Date, default: Date.now }
   }],
@@ -850,17 +855,85 @@ app.post('/schedule-meeting', async (req, res) => {
     // Save meeting to database
     const savedMeeting = await newMeeting.save();
     
+    // Update the user's task with the meeting status
+    const updateResult = await User.findOneAndUpdate(
+      { 
+        username: username,
+        "tasks.uniqueTaskId": taskId 
+      },
+      { 
+        $set: { 
+          "tasks.$.isMeeting.status": "scheduled",
+          "tasks.$.isMeeting.title": title,
+          "tasks.$.isMeeting.description": description,
+          "tasks.$.isMeeting.meetingLink" :response.data.hangoutLink,
+          "tasks.$.isMeeting.date": new Date(startTime).toISOString().split('T')[0],
+          "tasks.$.isMeeting.time": new Date(startTime).toTimeString().split(' ')[0],
+          "tasks.$.isMeeting.duration": duration
+        } 
+      },
+      { new: true }
+    );
+    
+    if (!updateResult) {
+      console.warn(`User or task not found: username=${username}, taskId=${taskId}`);
+    }
+    
     return res.json({
       success: true,
       organizer: organizer.email,
       meetLink: response.data.hangoutLink,
       eventLink: response.data.htmlLink,
-      meeting: savedMeeting
+      meeting: savedMeeting,
+      userTaskUpdated: !!updateResult
     });
     
   } catch (error) {
     console.error(`Error scheduling meeting:`, error);
     return res.status(500).json({ error: error.message });
+  }
+});
+app.post('/update-meeting-info', async (req, res) => {
+  try {
+    const { username, task_id, raw_transcript, adjusted_transcript, meeting_minutes_and_tasks } = req.body;
+    
+    // Validate required fields
+    if (!username || !task_id) {
+      return res.status(400).json({ error: 'Username and task_id are required' });
+    }
+    
+    // Find the user by username and update the specific task
+    const updatedUser = await User.findOneAndUpdate(
+      { 
+        username: username, 
+        "tasks.uniqueTaskId": task_id 
+      },
+      { 
+        $set: { 
+          "tasks.$.isMeeting.status": "completed",
+          "tasks.$.isMeeting.meetingRawData": raw_transcript,
+          "tasks.$.isMeeting.meetingMinutes": meeting_minutes_and_tasks,
+          "tasks.$.isMeeting.meetingSummary": adjusted_transcript
+        } 
+      },
+      { new: true } // Return the updated document
+    );
+    
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User or task not found' });
+    }
+    
+    // Find the specific task that was updated
+    const updatedTask = updatedUser.tasks.find(task => task.uniqueTaskId === task_id);
+    
+    res.status(200).json({ 
+      message: 'Meeting information updated successfully',
+      updatedTask
+    });
+    
+  } catch (error) {
+    console.error('Error updating meeting info:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
