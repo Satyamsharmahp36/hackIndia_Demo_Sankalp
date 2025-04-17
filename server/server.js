@@ -69,6 +69,7 @@ const userSchema = new mongoose.Schema({
     taskDescription: { type: String, default: 'Task request' },
     status: { type: String, enum: ['pending', 'inprogress', 'completed', 'cancelled'], default: 'inprogress' },
     presentUserData: { type: mongoose.Schema.Types.Mixed },
+    topicContext:{type :String},
     isMeeting: {
       title: String,
       description: String,
@@ -937,6 +938,36 @@ app.post('/update-meeting-info', async (req, res) => {
   }
 });
 
+app.get('/meeting-records', async (req, res) => {
+  try {
+    const meetingRecords = await MeetingData.find();
+    res.json(meetingRecords);
+  } catch (err) {
+    console.error('Error fetching meeting records:', err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.delete('/delete-meeting-record/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    
+    // Find and delete the record with the given taskId
+    const deletedRecord = await MeetingData.findOneAndDelete({ taskId });
+    
+    if (!deletedRecord) {
+      return res.status(404).json({ message: 'Meeting record not found with this taskId' });
+    }
+    
+    res.json({ 
+      message: 'Meeting record deleted successfully',
+      deletedRecord
+    });
+  } catch (err) {
+    console.error('Error deleting meeting record:', err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 // const PING_SERVICE_URL = process.env.PING_SERVICE_URL;
 
 // const pingSecondaryService = async () => {
