@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const axios = require('axios');
 const { google } = require('googleapis');
 const crypto = require('crypto');
+const MeetingData = require('./Schema/MeetingDataSchema');
 
 const verificationSessions = new Map();
 
@@ -23,9 +24,23 @@ const oAuth2Client = new OAuth2Client(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 5000, // Timeout after 5 seconds
+  socketTimeoutMS: 45000, // Socket timeout after 45 seconds
+  connectTimeoutMS: 10000, // Connection timeout after 10 seconds
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(async () => {
+  console.log('Connected to MongoDB');
+  
+  // Attempt to drop the problematic index
+  try {
+    await mongoose.connection.db.collection('meetingdatas').dropIndex('id_1');
+    console.log('Successfully dropped the id_1 index');
+  } catch (err) {
+    console.log('Note about index:', err.message);
+  }
+}).catch(err => console.error('MongoDB connection error:', err));
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -60,7 +75,7 @@ const userSchema = new mongoose.Schema({
       date: String,
       time: String,
       duration: String || Number,
-      status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' }
+      status: { type: String, enum: ['scheduled', 'completed', 'cancelled', 'pending'], default: 'pending' }
     },
     createdAt: { type: Date, default: Date.now }
   }],
@@ -656,36 +671,131 @@ app.get('/users/count', async (req, res) => {
   }
 });
 
+// app.post('/schedule-meeting', async (req, res) => {
+//   const { taskId,username,title, description, startTime, endTime, userEmails } = req.body;
+//   console.log(taskId);
+
+
+//   // Fetch all user details
+//   const users = await User.find({ email: { $in: userEmails } });
+
+//   // Identify the organizer (first email)
+//   const organizerEmail = userEmails[0];
+  
+//   const organizer = users.find(u => u.email === organizerEmail && u.google && u.google.refreshToken);
+
+//   if (!organizer) {
+//     return res.status(400).json({ error: 'Organizer has not linked Google Calendar.' });
+//   }
+
+//   const oAuth2Client = new google.auth.OAuth2(
+//     process.env.GOOGLE_CLIENT_ID,
+//     process.env.GOOGLE_CLIENT_SECRET,
+//     process.env.GOOGLE_REDIRECT_URI
+//   );
+
+//   oAuth2Client.setCredentials({
+//     refresh_token: organizer.google.refreshToken
+//   });
+
+//   try {
+//     const { credentials } = await oAuth2Client.refreshAccessToken();
+//     oAuth2Client.setCredentials(credentials);
+
+//     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+//     const event = {
+//       summary: title,
+//       description,
+//       start: {
+//         dateTime: new Date(startTime).toISOString(),
+//         timeZone: 'Asia/Kolkata',
+//       },
+//       end: {
+//         dateTime: new Date(endTime).toISOString(),
+//         timeZone: 'Asia/Kolkata',
+//       },
+//       attendees: users.map(u => ({ email: u.email })),
+//       conferenceData: {
+//         createRequest: {
+//           requestId: `meet-${Date.now()}`,
+//           conferenceSolutionKey: { type: 'hangoutsMeet' },
+//         }
+//       },
+//     };
+
+//     const response = await calendar.events.insert({
+//       calendarId: 'primary',
+//       resource: event,
+//       sendUpdates: 'all',
+//       conferenceDataVersion: 1,
+//     });
+
+//     // Calculate duration
+//     const start = new Date(startTime);
+//     const end = new Date(endTime);
+//     const durationMs = end - start;
+//     const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+//     const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+//     const duration = durationHours > 0 ? 
+//         `${durationHours}h${durationMinutes > 0 ? ` ${durationMinutes}m` : ''}` : 
+//         `${durationMinutes}m`;
+    
+//     // Create new meeting document
+//     const newMeeting = new MeetingData({
+//         google_meeting_link: response.data.hangoutLink,
+//         start_time: startTime,
+//         end_time: endTime,
+//         duration,
+//         username
+//     });
+    
+//     // Save meeting to database
+//     await newMeeting.save();
+
+//     return res.json({
+//       success: true,
+//       organizer: organizer.email,
+//       meetLink: response.data.hangoutLink,
+//       eventLink: response.data.htmlLink,
+//       meeting: newMeeting
+//     });
+
+//   } catch (error) {
+//     console.error(`Error scheduling meeting:`, error.message);
+//     return res.status(500).json({ error: error.message });
+//   }
+// });
 app.post('/schedule-meeting', async (req, res) => {
-  const { title, description, startTime, endTime, userEmails } = req.body;
-
-  // Fetch all user details
-  const users = await User.find({ email: { $in: userEmails } });
-
-  // Identify the organizer (first email)
-  const organizerEmail = userEmails[0];
-  const organizer = users.find(u => u.email === organizerEmail && u.google && u.google.refreshToken);
-
-  if (!organizer) {
-    return res.status(400).json({ error: 'Organizer has not linked Google Calendar.' });
-  }
-
-  const oAuth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  );
-
-  oAuth2Client.setCredentials({
-    refresh_token: organizer.google.refreshToken
-  });
-
+  const { taskId, username, title, description, startTime, endTime, userEmails } = req.body;
+  
   try {
+    // Fetch all user details
+    const users = await User.find({ email: { $in: userEmails } });
+    
+    // Identify the organizer (first email)
+    const organizerEmail = userEmails[0];
+    const organizer = users.find(u => u.email === organizerEmail && u.google && u.google.refreshToken);
+    
+    if (!organizer) {
+      return res.status(400).json({ error: 'Organizer has not linked Google Calendar.' });
+    }
+    
+    const oAuth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+    
+    oAuth2Client.setCredentials({
+      refresh_token: organizer.google.refreshToken
+    });
+    
     const { credentials } = await oAuth2Client.refreshAccessToken();
     oAuth2Client.setCredentials(credentials);
-
+    
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
-
+    
     const event = {
       summary: title,
       description,
@@ -705,27 +815,54 @@ app.post('/schedule-meeting', async (req, res) => {
         }
       },
     };
-
+    
     const response = await calendar.events.insert({
       calendarId: 'primary',
       resource: event,
       sendUpdates: 'all',
       conferenceDataVersion: 1,
     });
-
+    
+    // Calculate duration
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const durationMs = end - start;
+    const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+    const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+    const duration = durationHours > 0 ? 
+      `${durationHours}h${durationMinutes > 0 ? ` ${durationMinutes}m` : ''}` : 
+      `${durationMinutes}m`;
+    
+    // Generate a unique ID explicitly
+    const uniqueId = new mongoose.Types.ObjectId().toString();
+    
+    // Create new meeting document with explicit id
+    const newMeeting = new MeetingData({
+      id: uniqueId, // Set the id explicitly
+      taskId: taskId,
+      google_meeting_link: response.data.hangoutLink,
+      start_time: startTime,
+      end_time: endTime,
+      duration,
+      username
+    });
+    
+    // Save meeting to database
+    const savedMeeting = await newMeeting.save();
+    
     return res.json({
       success: true,
       organizer: organizer.email,
       meetLink: response.data.hangoutLink,
       eventLink: response.data.htmlLink,
+      meeting: savedMeeting
     });
-
+    
   } catch (error) {
-    console.error(`Error scheduling meeting:`, error.message);
+    console.error(`Error scheduling meeting:`, error);
     return res.status(500).json({ error: error.message });
   }
 });
-
 
 // const PING_SERVICE_URL = process.env.PING_SERVICE_URL;
 

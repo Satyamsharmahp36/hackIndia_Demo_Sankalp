@@ -14,11 +14,14 @@ import {
   Clock as ClockIcon, 
   XCircle,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Video
 } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { toast } from 'react-toastify';
 import DailyWorkflow from './DailyWorkflow';
+import CalendarScheduler from './AdminComponents/CalendarScheduler'; 
+import CalendarMeetingForm from './AdminComponents/CalendarMeetingForm';
 import axios from 'axios';
 import apiService from '../services/apiService';
 
@@ -37,6 +40,10 @@ const AdminPanel = ({ userData, onClose }) => {
   const [userDescriptions, setUserDescriptions] = useState({});
   const [isDeleting, setIsDeleting] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [meetingDetails, setMeetingDetails] = useState(null);
+  const [showCalendarScheduler, setShowCalendarScheduler] = useState(false);
+  const [calendarData, setCalendarData] = useState(null);
 
   const scrollbarStyles = `
   ::-webkit-scrollbar {
@@ -138,6 +145,46 @@ const AdminPanel = ({ userData, onClose }) => {
     }
   };
 
+  const handleScheduleMeeting = (task) => {
+    if (task.isMeeting && task.isMeeting.title) {
+      // Prepare the initial data for the form
+      const meetingData = {
+        taskId: task.uniqueTaskId, // Add this line to store the taskId
+        title: task.isMeeting.title,
+        description: task.isMeeting.description || task.taskDescription || "",
+        date: task.isMeeting.date,
+        time: task.isMeeting.time,
+        duration: parseInt(task.isMeeting.duration, 10) || 30,
+        userEmails: [
+          userData.user.email, // Admin's email
+          task.presentUserData?.email || "" // User's email
+        ].filter(email => email) // Filter out empty emails
+      };
+      
+      setMeetingDetails(meetingData);
+      setShowScheduler(true);
+    }
+  };
+
+  const handleFormSubmit = (formattedData) => {
+    console.log("Scheduling meeting with data:", formattedData);
+    
+    // Here you would typically send this data to your backend
+    // For now, just pass it to the CalendarScheduler component
+    setCalendarData({
+      ...formattedData,
+      taskId: meetingDetails.taskId // Make sure taskId is passed along
+    });
+    setShowScheduler(false);
+    setShowCalendarScheduler(true);
+  };
+
+  const handleCloseScheduler = () => {
+    setShowScheduler(false);
+    setShowCalendarScheduler(false);
+    setMeetingDetails(null);
+    setCalendarData(null);
+  };
 
   const generateUserDescription = async (prompt) => {
     try {
@@ -273,6 +320,40 @@ const AdminPanel = ({ userData, onClose }) => {
       className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
     >
       <style>{scrollbarStyles}</style>
+
+      {showScheduler && meetingDetails && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80">
+          <CalendarMeetingForm
+            initialData={meetingDetails}
+            onSchedule={handleFormSubmit}
+            onClose={handleCloseScheduler}
+          />
+        </div>
+      )}
+
+      {showCalendarScheduler && calendarData && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80">
+          <div className="bg-gray-900 rounded-xl p-4 w-full max-w-3xl max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-white">Calendar Integration</h3>
+              <button onClick={handleCloseScheduler} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-2">
+              <CalendarScheduler
+              taskId={calendarData.taskId}
+              username={userData.user.username} 
+                title={calendarData.title} 
+                description={calendarData.description} 
+                startTime={calendarData.startTime} 
+                endTime={calendarData.endTime} 
+                userEmails={calendarData.userEmails}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
@@ -424,6 +505,12 @@ const AdminPanel = ({ userData, onClose }) => {
                             <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">
                               ID: {task.uniqueTaskId || "N/A"}
                             </span>
+                            {task.isMeeting && task.isMeeting.title && (
+                              <span className="text-xs text-blue-300 bg-blue-900 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Meeting
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <motion.button
@@ -455,6 +542,40 @@ const AdminPanel = ({ userData, onClose }) => {
                         )}
                         
                         <p className="text-gray-300 text-base mb-4">{task.taskQuestion}</p>
+                        
+                        {/* Meeting details if present */}
+                        {task.isMeeting && task.isMeeting.title && (
+                          <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="text-white font-medium mb-1">{task.isMeeting.title}</h4>
+                                <div className="flex items-center gap-4 text-sm text-gray-300">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-4 h-4" /> {task.isMeeting.date}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-4 h-4" /> {task.isMeeting.time}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <ClockIcon className="w-4 h-4" /> {task.isMeeting.duration} min
+                                  </span>
+                                </div>
+                                {task.isMeeting.description && (
+                                  <p className="text-gray-400 text-sm mt-2">{task.isMeeting.description}</p>
+                                )}
+                              </div>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => handleScheduleMeeting(task)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                              >
+                                <Video className="w-4 h-4" />
+                                Schedule
+                              </motion.button>
+                            </div>
+                          </div>
+                        )}
                         
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-1 text-gray-400 text-xs">
