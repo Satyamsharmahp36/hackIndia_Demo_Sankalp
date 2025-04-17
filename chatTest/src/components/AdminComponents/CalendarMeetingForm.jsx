@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, Users, Edit3, ChevronDown } from 'lucide-react';
 
 const CalendarMeetingForm = ({ initialData, onSchedule, onClose }) => {
-  // State for form data
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -13,10 +12,8 @@ const CalendarMeetingForm = ({ initialData, onSchedule, onClose }) => {
     userEmails: ['', '']
   });
 
-  // Initialize form with data if provided
   useEffect(() => {
     if (initialData) {
-      // Check if the incoming duration matches any of our preset options
       const presetDurations = [15, 30, 45, 60, 90, 120];
       const duration = initialData.duration || 30;
       const isCustomDuration = !presetDurations.includes(duration);
@@ -33,20 +30,17 @@ const CalendarMeetingForm = ({ initialData, onSchedule, onClose }) => {
     }
   }, [initialData]);
 
-  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle email changes
   const handleEmailChange = (index, value) => {
     const updatedEmails = [...formData.userEmails];
     updatedEmails[index] = value;
     setFormData(prev => ({ ...prev, userEmails: updatedEmails }));
   };
 
-  // Add new email field
   const addEmailField = () => {
     setFormData(prev => ({
       ...prev,
@@ -54,7 +48,6 @@ const CalendarMeetingForm = ({ initialData, onSchedule, onClose }) => {
     }));
   };
 
-  // Remove email field
   const removeEmailField = (index) => {
     if (formData.userEmails.length <= 1) return;
     
@@ -66,7 +59,6 @@ const CalendarMeetingForm = ({ initialData, onSchedule, onClose }) => {
     }));
   };
 
-  // Toggle between preset durations and custom duration
   const toggleCustomDuration = () => {
     setFormData(prev => ({
       ...prev,
@@ -75,7 +67,6 @@ const CalendarMeetingForm = ({ initialData, onSchedule, onClose }) => {
   };
 
   const handleDurationChange = (e) => {
-    // Handle both dropdown and numeric input for duration
     const value = parseInt(e.target.value, 10);
     if (!isNaN(value) && value > 0) {
       setFormData(prev => ({ ...prev, duration: value }));

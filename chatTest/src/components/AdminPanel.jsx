@@ -15,13 +15,16 @@ import {
   XCircle,
   RefreshCw,
   ExternalLink,
-  Video
+  Video,
+  FileText,
+  Link
 } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { toast } from 'react-toastify';
 import DailyWorkflow from './DailyWorkflow';
 import CalendarScheduler from './AdminComponents/CalendarScheduler'; 
 import CalendarMeetingForm from './AdminComponents/CalendarMeetingForm';
+import MeetingDetailsPopup from './AdminComponents/MeetingDetailsPopup';
 import axios from 'axios';
 import apiService from '../services/apiService';
 
@@ -44,6 +47,8 @@ const AdminPanel = ({ userData, onClose }) => {
   const [meetingDetails, setMeetingDetails] = useState(null);
   const [showCalendarScheduler, setShowCalendarScheduler] = useState(false);
   const [calendarData, setCalendarData] = useState(null);
+  const [showMeetingDetailsPopup, setShowMeetingDetailsPopup] = useState(false);
+  const [selectedMeeting, setSelectedMeeting] = useState(null);
 
   const scrollbarStyles = `
   ::-webkit-scrollbar {
@@ -166,6 +171,15 @@ const AdminPanel = ({ userData, onClose }) => {
     }
   };
 
+  const handleViewMeetingDetails = (meeting) => {
+    setSelectedMeeting(meeting);
+    setShowMeetingDetailsPopup(true);
+  };
+
+  const handleOpenMeetingLink = (meetingLink) => {
+    window.open(meetingLink, '_blank');
+  };
+
   const handleFormSubmit = (formattedData) => {
     console.log("Scheduling meeting with data:", formattedData);
     
@@ -184,6 +198,11 @@ const AdminPanel = ({ userData, onClose }) => {
     setShowCalendarScheduler(false);
     setMeetingDetails(null);
     setCalendarData(null);
+  };
+
+  const handleCloseMeetingDetailsPopup = () => {
+    setShowMeetingDetailsPopup(false);
+    setSelectedMeeting(null);
   };
 
   const generateUserDescription = async (prompt) => {
@@ -301,6 +320,17 @@ const AdminPanel = ({ userData, onClose }) => {
     }
   };
 
+  const getMeetingCardStyle = (meetingStatus) => {
+    switch(meetingStatus) {
+      case 'scheduled':
+        return 'border-blue-600 bg-blue-900/20';
+      case 'completed':
+        return 'border-green-600 bg-green-900/20';
+      default: // pending
+        return 'border-gray-700 bg-gray-700';
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -342,17 +372,25 @@ const AdminPanel = ({ userData, onClose }) => {
             </div>
             <div className="p-2">
               <CalendarScheduler
-              taskId={calendarData.taskId}
-              username={userData.user.username} 
+                taskId={calendarData.taskId}
+                username={userData.user.username} 
                 title={calendarData.title} 
                 description={calendarData.description} 
                 startTime={calendarData.startTime} 
                 endTime={calendarData.endTime} 
                 userEmails={calendarData.userEmails}
+                onSuccess={refreshUserData} // Pass the refreshUserData function
               />
             </div>
           </div>
         </div>
+      )}
+
+      {showMeetingDetailsPopup && selectedMeeting && (
+        <MeetingDetailsPopup 
+          meeting={selectedMeeting} 
+          onClose={handleCloseMeetingDetailsPopup} 
+        />
       )}
 
       <motion.div
@@ -534,18 +572,24 @@ const AdminPanel = ({ userData, onClose }) => {
                             </motion.button>
                           </div>
                         </div>
-                        
-                        {task.taskDescription && (
+
+                        {task.topicContext && (
                           <p className="text-gray-400 text-sm mb-2">
-                            {renderDescription(task.taskDescription)}
+                           <span className='text-gray-300 font-bold '>Context :-</span>   {renderDescription(task.topicContext)}
                           </p>
                         )}
                         
-                        <p className="text-gray-300 text-base mb-4">{task.taskQuestion}</p>
+                        {task.taskDescription && (
+                          <p className="text-gray-400 text-sm mb-2">
+                           <span className='text-gray-300 font-bold  '>Description :-</span> {renderDescription(task.taskDescription)}
+                          </p>
+                        )}
+
+                        <p className="text-gray-400 text-sm mb-4"><span className='text-gray-300 font-bold '>User Message :- </span>{task.taskQuestion}</p>
                         
                         {/* Meeting details if present */}
                         {task.isMeeting && task.isMeeting.title && (
-                          <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                          <div className={`rounded-lg p-3 mb-4 border ${getMeetingCardStyle(task.isMeeting.status)}`}>
                             <div className="flex justify-between items-start">
                               <div>
                                 <h4 className="text-white font-medium mb-1">{task.isMeeting.title}</h4>
@@ -563,16 +607,53 @@ const AdminPanel = ({ userData, onClose }) => {
                                 {task.isMeeting.description && (
                                   <p className="text-gray-400 text-sm mt-2">{task.isMeeting.description}</p>
                                 )}
+                                {task.isMeeting.status && (
+                                  <span className={`mt-2 inline-block text-xs px-2 py-0.5 rounded-full 
+                                    ${task.isMeeting.status === 'pending' ? 'bg-yellow-900 text-yellow-300' : 
+                                      task.isMeeting.status === 'scheduled' ? 'bg-blue-900 text-blue-300' : 
+                                      'bg-green-900 text-green-300'}`}
+                                  >
+                                    {task.isMeeting.status.charAt(0).toUpperCase() + task.isMeeting.status.slice(1)}
+                                  </span>
+                                )}
                               </div>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleScheduleMeeting(task)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
-                              >
-                                <Video className="w-4 h-4" />
-                                Schedule
-                              </motion.button>
+                              
+                              {/* Different buttons based on meeting status */}
+                              {task.isMeeting.status === 'pending' && (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => handleScheduleMeeting(task)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                                >
+                                  <Calendar className="w-4 h-4" />
+                                  Schedule
+                                </motion.button>
+                              )}
+                              
+                              {task.isMeeting.status === 'scheduled' && task.isMeeting.meetingLink && (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => handleOpenMeetingLink(task.isMeeting.meetingLink)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                                >
+                                  <Link className="w-4 h-4" />
+                                  Meeting Link
+                                </motion.button>
+                              )}
+                              
+                              {task.isMeeting.status === 'completed' && (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => handleViewMeetingDetails(task.isMeeting)}
+                                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                  View Details
+                                </motion.button>
+                              )}
                             </div>
                           </div>
                         )}

@@ -231,6 +231,8 @@ async function createTask(taskQuestion, taskDescription, userData, presentData, 
       description: meetingDetails.description || enhancedDescription
     } : null;
 
+    console.log("rfgnkifniuenfiu wefn", topicContext);
+
     const response = await fetch(`${import.meta.env.VITE_BACKEND}/create-task`, {
       method: 'POST',
       headers: {
@@ -642,7 +644,7 @@ if (missingDetails.length === 0) {
   }
 } else {
   // Missing some details, ask for them - but more simply
-  return `Please provide the following details for your meeting: ${missingDetails.join(', ')}.`;
+  return `Please provide the following details for your meeting: Date , Time and Duration of the meet}.`;
 }
       
     }
@@ -672,9 +674,7 @@ if (missingDetails.length === 0) {
             taskDescription += `\nRelevant links: ${urls.join(', ')}\n`;
           }
           
-          if (conversationTopic) {
-            taskDescription += `\nContext: ${conversationTopic}`;
-          }
+ 
           
           // Use the original question instead of the "yes" confirmation
           const originalQuestion = pendingMeetingDetails.originalQuestion || question;

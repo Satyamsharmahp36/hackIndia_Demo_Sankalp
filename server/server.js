@@ -1,3 +1,4 @@
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -78,7 +79,7 @@ const userSchema = new mongoose.Schema({
       duration: String || Number,
       status: { type: String, enum: ['scheduled', 'completed', 'cancelled', 'pending'], default: 'pending' },
       meetingLink:{type:String },
-      // New fields for meeting information
+      topicContext:{type :String},
       meetingRawData: { type: String, default: '' },
       meetingMinutes: { type: String, default: '' },
       meetingSummary: { type: String, default: '' }
@@ -522,7 +523,7 @@ app.post('/create-task', async (req, res) => {
         date: isMeeting.date,
         time: isMeeting.time, 
         duration: isMeeting.duration,
-        status: 'scheduled'
+        status: 'pending'
       };
     }
     
@@ -982,5 +983,6 @@ app.delete('/delete-meeting-record/:taskId', async (req, res) => {
 app.listen(5000, () => {
   console.log('Server running on port 5000');
   
-  // setInterval(pingSecondaryService, 10 * 60 * 1000);
+  // setInterval(pingSecondaryService, 10 * 60 * 1000);
 });
+
