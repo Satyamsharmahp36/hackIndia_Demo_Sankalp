@@ -81,7 +81,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
   }, [userData]);
 
   useEffect(() => {
-    const storedName = sessionStorage.getItem('userName');
+    const storedName = sessionStorage.getItem('presentUserName');
     if (!userName && storedName) {
       const updatedChatHistoryKey = `${storedName}_${userData.user.name}`;
       const allChatHistories = JSON.parse(localStorage.getItem('chatHistories') || '{}');
@@ -271,9 +271,21 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
       setMessages(updatedMessages);
       setLastQuestion(originalText);
       
+      const urlPattern = /(https?:\/\/[^\s]+)/g;
+      const urls = originalText.match(urlPattern) || [];
+      
       let textForAI = originalText;
       if (detectedLangCode !== "en") {
         textForAI = await translateText(originalText, detectedLangCode, "en");
+        
+        if (urls.length > 0) {
+          let translatedUrlPattern = /(https?:\/\/[^\s]+)/g;
+          let translatedUrls = textForAI.match(translatedUrlPattern) || [];
+          
+          for (let i = 0; i < Math.min(urls.length, translatedUrls.length); i++) {
+            textForAI = textForAI.replace(translatedUrls[i], urls[i]);
+          }
+        }
       }
   
       const englishResponse = await getAnswer(
@@ -491,7 +503,7 @@ const ChatBot = ({ userName, userData, onRefetchUserData, presentUserData }) => 
                   <User className="w-4 h-4 mr-2 text-blue-300" />
                 )}
                 <div className="text-xs opacity-70">
-                  {message.type === 'bot' ? 'Assistant' : sessionStorage.getItem('userName') || 'You'}
+                  {message.type === 'bot' ? 'Assistant' : sessionStorage.getItem('presentUserName') || 'You'}
                   {message.timestamp && (
                     <span className="ml-2 text-xs opacity-50">
                       {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}

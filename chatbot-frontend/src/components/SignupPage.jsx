@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { FcGoogle } from 'react-icons/fc';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -11,7 +12,8 @@ import {
   Sparkles,
   AlertTriangle,
   Clock,
-  Copy
+  Copy,
+  MailCheck
 } from 'lucide-react';
 
 const scrollbarStyles = `
@@ -55,15 +57,25 @@ const SignupPage = () => {
     showPassword: false,
     showGeminiKeyModal: false,
     showSuccessModal: false,
+    showGooglePrompt: false,
     usePublicKey: false,
     activeField: null,
     loading: false,
-    globalError: null
+    globalError: null,
+    calendarStatusMessage:'',
+    emailVerified: false,
+    verificationInProgress: false
+  });
+
+  const [googleAuth, setGoogleAuth] = useState({
+    accessToken: null,
+    refreshToken: null,
+    googleId: null,
+    tokenExpiryDate: null
   });
 
   const [errors, setErrors] = useState({});
   const [copied, setCopied] = useState(false);
-
 
   const inputVariants = {
     initial: { 
@@ -102,14 +114,70 @@ const SignupPage = () => {
     }
   };
 
+  // Listen for messages from email verification popup
+  useEffect(() => {
+    const handleEmailVerification = (event) => {
+      // Ensure the message is from your backend for security
+      if (event.origin !== 'http://localhost:5000') return;
+
+      const { success, userData, message } = event.data;
+      
+      setUiState(prev => ({
+        ...prev,
+        verificationInProgress: false
+      }));
+
+      if (success && userData) {
+        // Set the form email to the verified email from Google
+        setFormData(prev => ({
+          ...prev,
+          email: userData.email
+        }));
+
+        // Store Google auth credentials
+        setGoogleAuth({
+          accessToken: userData.accessToken,
+          refreshToken: userData.refreshToken,
+          googleId: userData.googleId,
+          tokenExpiryDate: userData.tokenExpiryDate
+        });
+
+        // Mark email as verified
+        setUiState(prev => ({
+          ...prev,
+          emailVerified: true,
+          globalError: null
+        }));
+
+        // Clear any existing email error
+        setErrors(prev => {
+          const newErrors = {...prev};
+          delete newErrors.email;
+          return newErrors;
+        });
+      } else {
+        // Show error message
+        setUiState(prev => ({
+          ...prev,
+          globalError: message || "Email verification failed"
+        }));
+      }
+    };
+
+    window.addEventListener('message', handleEmailVerification);
+
+    return () => {
+      window.removeEventListener('message', handleEmailVerification);
+    };
+  }, []);
+
   const validateForm = useCallback(() => {
     const newErrors = {};
     const validationRules = {
       name: (value) => !value.trim() && "Name is required",
       email: (value) => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return !value.trim() ? "Email is required" : 
-               !emailRegex.test(value) ? "Invalid email format" : false;
+        if (!uiState.emailVerified) return "Email verification required";
+        return false;
       },
       mobileNo: (value) => {
         const mobileRegex = /^[0-9]{10}$/;
@@ -142,10 +210,16 @@ const SignupPage = () => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, uiState.usePublicKey]);
+  }, [formData, uiState.usePublicKey, uiState.emailVerified]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // If changing email, mark it as unverified
+    if (name === 'email' && uiState.emailVerified) {
+      setUiState(prev => ({...prev, emailVerified: false}));
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -158,6 +232,18 @@ const SignupPage = () => {
         return newErrors;
       });
     }
+  };
+
+  const verifyEmail = () => {
+    setUiState(prev => ({...prev, verificationInProgress: true, globalError: null}));
+    
+    const popup = window.open(
+      'http://localhost:5000/user/verify-email',
+      'GoogleEmailVerification',
+      'width=500,height=600'
+    );
+    
+    // The verification response is handled by the useEffect message listener
   };
 
   const toggleUsePublicKey = () => {
@@ -181,6 +267,16 @@ const SignupPage = () => {
     
     setUiState(prev => ({...prev, globalError: null, loading: true}));
 
+    // Ensure email is verified
+    if (!uiState.emailVerified) {
+      setUiState(prev => ({
+        ...prev, 
+        globalError: "Please verify your email with Google first",
+        loading: false
+      }));
+      return;
+    }
+
     if (validateForm()) {
       try {
         const apiKeyToUse = uiState.usePublicKey 
@@ -194,10 +290,21 @@ const SignupPage = () => {
           username: formData.username,
           password: formData.password,
           geminiApiKey: apiKeyToUse,
-          usePublicKey: uiState.usePublicKey
+          usePublicKey: uiState.usePublicKey,
+          google: {
+            id: googleAuth.googleId,
+            accessToken: googleAuth.accessToken,
+            refreshToken: googleAuth.refreshToken,
+            tokenExpiryDate: googleAuth.tokenExpiryDate
+          }
         });
 
-        setUiState(prev => ({...prev, showSuccessModal: true, loading: false}));
+        setUiState(prev => ({
+          ...prev, 
+          loading: false, 
+          showSuccessModal: true,
+          calendarStatusMessage: 'Google Sign-In & Calendar Access Successful! ✅'
+        }));
       } catch (error) {
         setUiState(prev => ({
           ...prev, 
@@ -221,7 +328,7 @@ const SignupPage = () => {
   const renderInputField = (field, index) => {
     const fieldConfig = {
       name: { label: "Full Name", type: "text" },
-      email: { label: "Email Address", type: "email" },
+      email: { label: "Email Address", type: "email", special: "email-verify" },
       mobileNo: { label: "Mobile Number", type: "tel" },
       username: { label: "Unique Username", type: "text" },
       password: { label: "Password", type: uiState.showPassword ? "text" : "password" },
@@ -249,17 +356,49 @@ const SignupPage = () => {
             placeholder={fieldConfig[field].label}
             value={formData[field]}
             onChange={handleChange}
+            disabled={field === 'email' && uiState.emailVerified}
             onFocus={() => setUiState(prev => ({...prev, activeField: field}))}
             onBlur={() => setUiState(prev => ({...prev, activeField: null}))}
             className={`w-full p-3 rounded-lg 
+              ${field === 'email' && uiState.emailVerified ? 'bg-green-900/30 border-green-500/50' : ''}
               ${uiState.activeField === field 
                 ? 'ring-2 ring-purple-500/70 bg-gray-700/70' 
                 : 'bg-gray-700/50'}
               ${errors[field] 
                 ? 'border-2 border-red-500' 
-                : 'border-transparent'}
+                : field === 'email' && uiState.emailVerified 
+                  ? 'border-2 border-green-500' 
+                  : 'border-transparent'}
               transition-all duration-300 ease-in-out text-sm md:text-base`}
           />
+
+          {field === 'email' && (
+            <button 
+              type="button"
+              onClick={verifyEmail}
+              disabled={uiState.emailVerified || uiState.verificationInProgress}
+              className={`absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded
+                ${uiState.emailVerified 
+                  ? 'bg-green-600/50 text-green-200 cursor-default'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'}
+                text-xs flex items-center transition-colors`}
+            >
+              {uiState.verificationInProgress ? (
+                <span>Verifying...</span>
+              ) : uiState.emailVerified ? (
+                <>
+                  <CheckCircle size={14} className="mr-1" />
+                  <span>Verified</span>
+                </>
+              ) : (
+                <>
+                  <FcGoogle className="mr-1" />
+                  <span>Verify</span>
+                </>
+              )}
+            </button>
+          )}
+
           {field === 'password' && (
             <button 
               type="button"
@@ -269,6 +408,7 @@ const SignupPage = () => {
               {uiState.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           )}
+          
           {field === 'geminiApiKey' && (
             <motion.button 
               type="button"
@@ -290,6 +430,16 @@ const SignupPage = () => {
             className="text-red-400 text-xs md:text-sm mt-1 pl-2 flex items-center"
           >
             <AlertTriangle size={14} className="mr-1" /> {errors[field]}
+          </motion.p>
+        )}
+
+        {field === 'email' && !errors[field] && !uiState.emailVerified && (
+          <motion.p 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-blue-400 text-xs md:text-sm mt-1 pl-2 flex items-center"
+          >
+            <Info size={14} className="mr-1" /> Verification required for Google Calendar integration
           </motion.p>
         )}
       </motion.div>
@@ -577,67 +727,51 @@ const SignupPage = () => {
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="bg-gray-800 rounded-xl p-4 md:p-6 max-w-md w-full text-center space-y-4 shadow-2xl border border-green-500/30 max-h-[90vh] overflow-auto"
-              style={{ scrollbarWidth: 'thin', scrollbarColor: '#4b5563 #1f2937' }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-green-500/40 shadow-xl shadow-green-500/10"
             >
-              <div className="flex justify-center mb-2">
-                <CheckCircle 
-                  size={60} 
-                  className="text-green-500 animate-pulse"
-                />
+              <div className="text-center mb-4">
+                <div className="inline-block p-3 bg-green-500/20 rounded-full mb-3">
+                  <CheckCircle size={40} className="text-green-500" />
+                </div>
+                <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-teal-500">
+                  Registration Successful!
+                </h3>
+                <p className="text-gray-300 mt-2">Your account has been created successfully.</p>
               </div>
-              
-              <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500">
-                Registration Successful!
-              </h2>
-              
-              <div className="bg-gray-700/50 p-3 rounded-lg text-left">
-                <p className="text-gray-300 mb-2 text-sm">
-                  Your account has been created successfully. 
+
+              <div className="bg-gray-700/50 p-3 rounded-lg mb-4">
+                <div className="flex items-center mb-2">
+                  <MailCheck size={16} className="text-green-400 mr-2" />
+                  <h4 className="font-semibold text-green-400">Email Verification</h4>
+                </div>
+                <p className="text-sm text-gray-300">
+                  Your email has been verified with Google successfully.
                 </p>
-                <div className="flex items-center space-x-2 text-blue-300 mb-2 text-sm">
-                  <Info size={16} />
-                  <p>Next Step: Access your personalized content platform</p>
-                </div>
-                
-                <div className="bg-blue-900/30 p-2 rounded-lg border border-blue-500/30">
-                  <p className="text-gray-400 text-xs mb-1">Your personal URL:</p>
-                  <div className="flex items-center bg-gray-800/70 rounded-lg p-2 overflow-hidden">
-                      <p className="text-green-300 font-mono text-xs truncate">
-                        http://localhost:5173/home/{formData.username}
-                      </p>
-                      <motion.button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(`http://localhost:5173/home/${formData.username}`);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
-                        }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="ml-2 text-gray-400 hover:text-white flex-shrink-0 transition-colors duration-300"
-                      >
-                        {copied ? (
-                          <CheckCircle size={16} className="text-green-500" />
-                        ) : (
-                          <Copy size={16} />
-                        )}
-                      </motion.button>
-                    </div>
-                </div>
               </div>
-              
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={handleRedirectToContent}
-                className="w-full p-2.5 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 
-                text-white font-bold flex items-center justify-center space-x-2 text-sm
-                hover:from-green-600 hover:to-blue-600"
-              >
-                <span>Go to My Personal Dashboard</span>
-                <ArrowRight size={16} />
-              </motion.button>
+
+              <div className="bg-gray-700/50 p-3 rounded-lg mb-4">
+                <div className="flex items-center mb-2">
+                  <CheckCircle size={16} className="text-blue-400 mr-2" />
+                  <h4 className="font-semibold text-blue-400">Google Calendar Access</h4>
+                </div>
+                <p className="text-sm text-gray-300">
+                  {uiState.calendarStatusMessage}
+                </p>
+              </div>
+
+              <div className="flex justify-center">
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={handleRedirectToContent}
+                  className="px-6 py-2 bg-gradient-to-r from-green-500 to-teal-500 
+                    rounded-lg font-bold flex items-center"
+                >
+                  Continue to Dashboard
+                  <ArrowRight size={18} className="ml-2" />
+                </motion.button>
+              </div>
             </motion.div>
           </motion.div>
         )}

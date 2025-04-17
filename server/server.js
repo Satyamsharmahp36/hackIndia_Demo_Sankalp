@@ -4,10 +4,24 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 const axios = require('axios');
+const { google } = require('googleapis');
+const crypto = require('crypto');
+
+const verificationSessions = new Map();
+
+const { OAuth2Client } = require('google-auth-library');
 dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const CLIENT_URL=process.env.CLIENT_URL;
+
+const oAuth2Client = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
@@ -40,8 +54,22 @@ const userSchema = new mongoose.Schema({
     taskDescription: { type: String, default: 'Task request' },
     status: { type: String, enum: ['pending', 'inprogress', 'completed', 'cancelled'], default: 'inprogress' },
     presentUserData: { type: mongoose.Schema.Types.Mixed },
+    isMeeting: {
+      title: String,
+      description: String,
+      date: String,
+      time: String,
+      duration: String || Number,
+      status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' }
+    },
     createdAt: { type: Date, default: Date.now }
   }],
+  google: {
+    id: { type: String },
+    accessToken: { type: String },
+    refreshToken: { type: String },
+    tokenExpiryDate: { type: Date },
+  },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -60,6 +88,92 @@ function generateUniqueTaskId() {
   
   return `${seconds}${minutes}${hours}${day}${month}${year}`;
 }
+
+app.get('/user/verify-email', (req, res) => {
+  const sessionId = crypto.randomBytes(16).toString('hex');
+  
+  // Store session ID for verification callback
+  verificationSessions.set(sessionId, { timestamp: Date.now() });
+  
+  // Generate OAuth URL with state containing session ID
+  const state = sessionId;
+  const url = oAuth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/calendar'],
+    prompt: 'consent',
+    state
+  });
+  
+  res.redirect(url);
+});
+
+app.get('/user/google/callback', async (req, res) => {
+  const { code, state } = req.query;
+  
+  // Validate state to prevent CSRF
+  if (!verificationSessions.has(state)) {
+    return res.send(`
+      <script>
+        window.opener.postMessage(${JSON.stringify({
+          success: false,
+          message: "Invalid verification session"
+        })}, "*");
+        window.close();
+      </script>
+    `);
+  }
+  
+  try {
+    const { tokens } = await oAuth2Client.getToken(code);
+    oAuth2Client.setCredentials(tokens);
+
+    // Get user info from Google
+    const { data: googleUser } = await axios.get(
+      `https://www.googleapis.com/oauth2/v2/userinfo`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+        },
+      }
+    );
+    
+    // Clean up verification session
+    verificationSessions.delete(state);
+    
+    // Send verified user data back to client
+    return res.send(`
+      <script>
+        window.opener.postMessage(${JSON.stringify({
+          success: true,
+          userData: {
+            email: googleUser.email,
+            googleId: googleUser.id,
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            tokenExpiryDate: tokens.expiry_date || (Date.now() + tokens.expires_in * 1000)
+          },
+          message: 'Email verification successful'
+        })}, "*");
+        window.close();
+      </script>
+    `);
+  } catch (error) {
+    console.error('Google OAuth Error:', error);
+    
+    // Clean up verification session
+    verificationSessions.delete(state);
+    
+    return res.send(`
+      <script>
+        window.opener.postMessage(${JSON.stringify({
+          success: false,
+          message: 'Email verification failed: ' + error.message
+        })}, "*");
+        window.close();
+      </script>
+    `);
+  }
+});
 
 app.get('/user-prompt/:userId', async (req, res) => {
   try {
@@ -96,26 +210,62 @@ app.post('/update-user-prompt', async (req, res) => {
 
 app.post('/register', async (req, res) => {
   try {
-    const { name, email, mobileNo, username, password, geminiApiKey } = req.body;
-    
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) return res.status(400).json({ message: "Email or username already exists" });
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = new User({ 
+    const { 
       name, 
       email, 
       mobileNo, 
       username, 
       password, 
-      geminiApiKey 
+      geminiApiKey,
+      google 
+    } = req.body;
+    
+    // Check if Google info is provided
+    if (!google || !google.accessToken) {
+      return res.status(400).json({ message: "Email verification required" });
+    }
+    
+    // Check if username already exists
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return res.status(400).json({ message: "Username already exists" });
+    }
+    
+    // Check if email already exists
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create new user with Google info
+    const newUser = new User({ 
+      name, 
+      email, 
+      mobileNo, 
+      username, 
+      password: hashedPassword, 
+      geminiApiKey,
+      google: {
+        id: google.googleId,
+        accessToken: google.accessToken,
+        refreshToken: google.refreshToken,
+        tokenExpiryDate: google.tokenExpiryDate ? new Date(google.tokenExpiryDate) : null
+      }
     });
+    
     await newUser.save();
 
-    res.status(201).json({ message: "User registered successfully", userId: newUser._id });
+    res.status(201).json({ 
+      message: "User registered successfully", 
+      userId: newUser._id,
+      username: newUser.username
+    });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({ message: "Error registering user", error: error.message });
   }
 });
@@ -314,7 +464,16 @@ app.post('/find-task-by-question', async (req, res) => {
 
 app.post('/create-task', async (req, res) => {
   try {
-    const { userId, taskQuestion, taskDescription, status, presentUserData , uniqueTaskId } = req.body;
+    const { 
+      userId, 
+      taskQuestion, 
+      taskDescription, 
+      status, 
+      presentUserData, 
+      uniqueTaskId,
+      isMeeting,
+      topicContext
+    } = req.body;
     
     if (!userId || !taskQuestion) {
       return res.status(400).json({ message: "User ID and task question are required" });
@@ -324,8 +483,6 @@ app.post('/create-task', async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const taskId = uniqueTaskId || generateUniqueTaskId();
-
-
     
     const newTask = {
       uniqueTaskId: taskId,
@@ -333,18 +490,29 @@ app.post('/create-task', async (req, res) => {
       taskDescription: taskDescription || 'Task request',
       status: status || 'inprogress',
       presentUserData,
+      topicContext,
       createdAt: new Date()
     };
     
+    if (isMeeting) {
+      newTask.isMeeting = {
+        title: isMeeting.title || topicContext || "Meeting",
+        description: isMeeting.description || taskDescription,
+        date: isMeeting.date,
+        time: isMeeting.time, 
+        duration: isMeeting.duration,
+        status: 'scheduled'
+      };
+    }
+    
     user.tasks.push(newTask);
     await user.save();
-    
     
     res.status(201).json({ 
       message: "Task created successfully", 
       task: {
         id: user.tasks[user.tasks.length - 1]._id,
-        uniqueTaskId,
+        uniqueTaskId: taskId,
         ...newTask
       } 
     });
@@ -487,6 +655,77 @@ app.get('/users/count', async (req, res) => {
     });
   }
 });
+
+app.post('/schedule-meeting', async (req, res) => {
+  const { title, description, startTime, endTime, userEmails } = req.body;
+
+  // Fetch all user details
+  const users = await User.find({ email: { $in: userEmails } });
+
+  // Identify the organizer (first email)
+  const organizerEmail = userEmails[0];
+  const organizer = users.find(u => u.email === organizerEmail && u.google && u.google.refreshToken);
+
+  if (!organizer) {
+    return res.status(400).json({ error: 'Organizer has not linked Google Calendar.' });
+  }
+
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+
+  oAuth2Client.setCredentials({
+    refresh_token: organizer.google.refreshToken
+  });
+
+  try {
+    const { credentials } = await oAuth2Client.refreshAccessToken();
+    oAuth2Client.setCredentials(credentials);
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    const event = {
+      summary: title,
+      description,
+      start: {
+        dateTime: new Date(startTime).toISOString(),
+        timeZone: 'Asia/Kolkata',
+      },
+      end: {
+        dateTime: new Date(endTime).toISOString(),
+        timeZone: 'Asia/Kolkata',
+      },
+      attendees: users.map(u => ({ email: u.email })),
+      conferenceData: {
+        createRequest: {
+          requestId: `meet-${Date.now()}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        }
+      },
+    };
+
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      resource: event,
+      sendUpdates: 'all',
+      conferenceDataVersion: 1,
+    });
+
+    return res.json({
+      success: true,
+      organizer: organizer.email,
+      meetLink: response.data.hangoutLink,
+      eventLink: response.data.htmlLink,
+    });
+
+  } catch (error) {
+    console.error(`Error scheduling meeting:`, error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 
 // const PING_SERVICE_URL = process.env.PING_SERVICE_URL;
 
