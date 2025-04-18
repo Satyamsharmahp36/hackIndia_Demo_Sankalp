@@ -118,7 +118,6 @@ const SignupPage = () => {
   useEffect(() => {
     const handleEmailVerification = (event) => {
       // Ensure the message is from your backend for security
-      if (event.origin !== 'http://localhost:5000') return;
 
       const { success, userData, message } = event.data;
       
@@ -238,7 +237,7 @@ const SignupPage = () => {
     setUiState(prev => ({...prev, verificationInProgress: true, globalError: null}));
     
     const popup = window.open(
-      'http://localhost:5000/user/verify-email',
+      `${import.meta.env.VITE_BACKEND}/user/verify-email`,
       'GoogleEmailVerification',
       'width=500,height=600'
     );
@@ -280,7 +279,7 @@ const SignupPage = () => {
     if (validateForm()) {
       try {
         const apiKeyToUse = uiState.usePublicKey 
-          ? import.meta.env.VITE_GEMINI_KEY 
+          ? import.meta.env.VITE_GEMINI_KEY   
           : formData.geminiApiKey;
 
         const response = await axios.post(`${import.meta.env.VITE_BACKEND}/register`, {
@@ -322,7 +321,7 @@ const SignupPage = () => {
   };
   
   const handleRedirectToContent = () => {
-    window.open(`http://localhost:5173/home/${formData.username}`, '_blank');
+    window.open(`${import.meta.env.VITE_FRONTEND}/home/${formData.username}`, '_blank');
   };
 
   const renderInputField = (field, index) => {

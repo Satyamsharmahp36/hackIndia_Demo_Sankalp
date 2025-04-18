@@ -711,8 +711,7 @@ const AdminPanel = ({ userData, onClose }) => {
                                   <h4 className="text-gray-400 text-xs mb-1">User's Chat Assistant</h4>
                                   {task.presentUserData?.username ? (
                                     <a 
-                                      href={`https://localhost:5173/home/${task.presentUserData.username}`}
-                                      target="_blank"
+                                      href={`${import.meta.env.VITE_FRONTEND}/home/${task.presentUserData.username}`}                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-blue-500 hover:underline flex items-center"
                                     >
